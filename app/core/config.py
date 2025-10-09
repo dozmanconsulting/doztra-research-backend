@@ -27,6 +27,8 @@ class Settings(BaseSettings):
         "https://doztra.ai",      # Production frontend
         "https://doztra.netlify.app",  # Netlify deployment
         "https://www.doztra.netlify.app",  # Netlify with www subdomain
+        "https://doztra-ai.netlify.app",  # New Netlify deployment
+        "https://www.doztra-ai.netlify.app",  # New Netlify with www subdomain
     ]
     
     # Email settings
