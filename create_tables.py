@@ -72,6 +72,7 @@ def create_tables(engine):
         Column('role', String(50), nullable=False),
         Column('is_active', Boolean, nullable=False, default=True),
         Column('is_verified', Boolean, nullable=False, default=False),
+        Column('last_login', DateTime, nullable=True),  # Added last_login column
         Column('created_at', DateTime, nullable=False, server_default=func.now()),
         Column('updated_at', DateTime, nullable=False, server_default=func.now(), onupdate=func.now())
     )
@@ -213,6 +214,40 @@ def create_admin_user(session):
         session.rollback()
         return False
 
+def ensure_last_login_column(engine):
+    """Ensure the last_login column exists in the users table."""
+    logger.info("Checking for last_login column in users table...")
+    
+    try:
+        with engine.connect() as conn:
+            # Check if column exists
+            result = conn.execute(text("""
+                SELECT EXISTS (
+                    SELECT 1 
+                    FROM information_schema.columns 
+                    WHERE table_name = 'users' AND column_name = 'last_login'
+                )
+            """))
+            column_exists = result.scalar()
+            
+            if column_exists:
+                logger.info("last_login column already exists in users table")
+                return True
+            
+            # Add the column if it doesn't exist
+            logger.info("Adding last_login column to users table...")
+            conn.execute(text("""
+                ALTER TABLE users 
+                ADD COLUMN last_login TIMESTAMP WITHOUT TIME ZONE NULL
+            """))
+            conn.commit()
+            
+            logger.info("Successfully added last_login column to users table")
+            return True
+    except SQLAlchemyError as e:
+        logger.error(f"Error ensuring last_login column: {e}")
+        return False
+
 def check_tables(engine):
     """Check which tables exist in the database."""
     logger.info("Checking database tables...")
@@ -253,6 +288,9 @@ def main():
         
         # Create tables
         create_tables(engine)
+        
+        # Ensure last_login column exists
+        ensure_last_login_column(engine)
         
         # Create admin user
         create_admin_user(session)
