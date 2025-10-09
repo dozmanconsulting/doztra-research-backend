@@ -142,9 +142,37 @@ def create_tables(engine):
         Column('user_id', PostgresUUID(as_uuid=True), ForeignKey('users.id', ondelete='CASCADE'), nullable=False),
         Column('title', String(255), nullable=False),
         Column('description', Text),
+        Column('type', String(50), nullable=False, default='general'),
         Column('status', String(50), nullable=False, default='active'),
         Column('created_at', DateTime, nullable=False, server_default=func.now()),
-        Column('updated_at', DateTime, nullable=False, server_default=func.now(), onupdate=func.now())
+        Column('updated_at', DateTime, nullable=False, server_default=func.now(), onupdate=func.now()),
+        Column('project_metadata', JSONB, nullable=True)
+    )
+    
+    generated_content = Table(
+        'generated_content',
+        metadata,
+        Column('id', PostgresUUID(as_uuid=True), primary_key=True, default=uuid.uuid4),
+        Column('project_id', PostgresUUID(as_uuid=True), ForeignKey('research_projects.id', ondelete='CASCADE'), nullable=False),
+        Column('section_title', String(255), nullable=False),
+        Column('content', Text, nullable=False),
+        Column('version', Integer, default=1, nullable=False),
+        Column('created_at', DateTime, nullable=False, server_default=func.now()),
+        Column('updated_at', DateTime, nullable=False, server_default=func.now(), onupdate=func.now()),
+        Column('content_metadata', JSONB, nullable=True)
+    )
+    
+    content_feedback = Table(
+        'content_feedback',
+        metadata,
+        Column('id', PostgresUUID(as_uuid=True), primary_key=True, default=uuid.uuid4),
+        Column('content_id', PostgresUUID(as_uuid=True), ForeignKey('generated_content.id', ondelete='CASCADE'), nullable=False),
+        Column('user_id', PostgresUUID(as_uuid=True), ForeignKey('users.id', ondelete='CASCADE'), nullable=False),
+        Column('rating', Integer, nullable=False),
+        Column('comments', Text),
+        Column('created_at', DateTime, nullable=False, server_default=func.now()),
+        Column('updated_at', DateTime, nullable=False, server_default=func.now(), onupdate=func.now()),
+        Column('feedback_metadata', JSONB, nullable=True)
     )
     
     research_content = Table(
