@@ -85,6 +85,8 @@ async def send_message(
     - **created_at**: Timestamp of when the response was created
     """
     try:
+        from app.utils.uuid_helper import convert_uuid_to_str
+        
         response = await process_chat_message(
             db,
             current_user,
@@ -95,6 +97,9 @@ async def send_message(
             max_tokens=request.max_tokens,
             attachments=request.attachments
         )
+        
+        # Convert any UUID objects to strings
+        response = convert_uuid_to_str(response)
         
         return ChatResponse(
             conversation_id=response["conversation_id"],
@@ -139,6 +144,9 @@ async def list_conversations(
     - List of conversation objects with message counts and last message previews
     """
     try:
+        # Import UUID helper
+        from app.utils.uuid_helper import convert_uuid_to_str
+        
         # Get conversations with pagination
         conversations = get_user_conversations(db, current_user.id, skip, limit, sort_by, sort_order)
         
@@ -156,7 +164,8 @@ async def list_conversations(
                 preview = last_message.content[:50] + "..." if len(last_message.content) > 50 else last_message.content
                 conv.last_message = preview
         
-        return conversations
+        # Convert UUID objects to strings
+        return convert_uuid_to_str(conversations)
     except Exception as e:
         logger.error(f"Error retrieving conversations: {str(e)}")
         raise HTTPException(
@@ -185,6 +194,7 @@ async def create_new_conversation(
     - Newly created conversation object
     """
     from app.services.chat import create_conversation
+    from app.utils.uuid_helper import convert_uuid_to_str
     
     try:
         # Create the conversation
@@ -204,7 +214,7 @@ async def create_new_conversation(
                 conversation_id=new_conversation.id
             )
         
-        return new_conversation
+        return convert_uuid_to_str(new_conversation)
     except Exception as e:
         logger.error(f"Error creating conversation: {str(e)}")
         raise HTTPException(
@@ -235,6 +245,8 @@ async def get_conversation_messages_endpoint(
     - Conversation details including paginated messages and total message count
     """
     try:
+        from app.utils.uuid_helper import convert_uuid_to_str
+        
         conversation = get_conversation(db, conversation_id, current_user.id)
         if not conversation:
             raise HTTPException(
@@ -259,7 +271,7 @@ async def get_conversation_messages_endpoint(
             # create the response manually without using from_orm
             logger.warning(f"Error converting conversation to response: {str(e)}")
             response = ConversationDetailResponse(
-                id=conversation.id,
+                id=str(conversation.id),  # Convert UUID to string explicitly
                 title=conversation.title,
                 created_at=conversation.created_at,
                 updated_at=conversation.updated_at,
@@ -268,10 +280,12 @@ async def get_conversation_messages_endpoint(
                 total_messages=0
             )
         
-        response.messages = [MessageResponse.from_orm(msg) for msg in messages]
+        # Convert messages to response models and ensure UUIDs are strings
+        response.messages = [MessageResponse.from_orm(convert_uuid_to_str(msg)) for msg in messages]
         response.total_messages = total_count
         
-        return response
+        # Convert any remaining UUIDs to strings
+        return convert_uuid_to_str(response)
     except HTTPException:
         # Re-raise HTTP exceptions
         raise
@@ -304,6 +318,8 @@ async def update_conversation_details(
     - Updated conversation object
     """
     try:
+        from app.utils.uuid_helper import convert_uuid_to_str
+        
         updated_conversation = update_conversation(
             db, 
             conversation_id, 
@@ -318,7 +334,7 @@ async def update_conversation_details(
                 detail="Conversation not found"
             )
         
-        return updated_conversation
+        return convert_uuid_to_str(updated_conversation)
     except HTTPException:
         # Re-raise HTTP exceptions
         raise

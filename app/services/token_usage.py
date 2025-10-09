@@ -251,6 +251,10 @@ def track_token_usage(db: Session, user_id: str, token_usage_in: TokenUsageTrack
     """
     Track token usage for a user.
     """
+    # Convert UUID to string if it's a UUID object
+    if hasattr(user_id, 'hex'):
+        user_id = str(user_id)
+    
     token_usage_create = TokenUsageCreate(
         user_id=user_id,
         request_type=token_usage_in.request_type,
