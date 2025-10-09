@@ -49,6 +49,21 @@ async def generate_section_content(
     """
     Generate detailed content for a specific section of a research project.
     """
+    # Set up logging
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.info(f"Generating content for project ID: {request.project_id}")
+    
+    # Check if the project_id is a valid UUID
+    try:
+        # Try to validate the UUID format
+        if not request.project_id or not uuid.UUID(request.project_id, version=4):
+            logger.warning(f"Invalid UUID format for project_id: {request.project_id}")
+            raise HTTPException(status_code=400, detail="Invalid project ID format. Expected UUID.")
+    except ValueError:
+        logger.error(f"Invalid project_id format: {request.project_id}")
+        raise HTTPException(status_code=400, detail="Invalid project ID format. Expected UUID.")
+    
     # Verify the project exists and belongs to the user
     project = db.query(ResearchProject).filter(
         ResearchProject.id == request.project_id,
@@ -63,9 +78,6 @@ async def generate_section_content(
     project_type = request.project_type or project.type
     
     # Extract metadata from project_metadata JSON column
-    import logging
-    logger = logging.getLogger(__name__)
-    
     project_metadata = {}
     if project.project_metadata:
         # Extract specific fields from project_metadata with proper fallbacks
