@@ -109,17 +109,8 @@ class User(UserInDBBase):
     usage: Optional[UsageStatistics] = None
     
     model_config = {
-        "from_attributes": True,
-        "json_encoders": {
-            uuid.UUID: str
-        }
+        "from_attributes": True
     }
-    
-    @validator("id", "subscription.id", "subscription.user_id", pre=True)
-    def convert_uuid_to_str(cls, v):
-        if isinstance(v, uuid.UUID):
-            return str(v)
-        return v
 
 
 class UserWithToken(UserBase):

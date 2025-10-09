@@ -73,7 +73,17 @@ def register(
     send_welcome_email(user.email, user.name)
     
     # Create response
-    user_data = UserSchema.from_orm(user).dict()
+    user_data = UserSchema.model_validate(user).model_dump()
+    
+    # Convert UUID objects to strings
+    if "id" in user_data and isinstance(user_data["id"], uuid.UUID):
+        user_data["id"] = str(user_data["id"])
+    
+    if "subscription" in user_data and user_data["subscription"]:
+        if "id" in user_data["subscription"] and isinstance(user_data["subscription"]["id"], uuid.UUID):
+            user_data["subscription"]["id"] = str(user_data["subscription"]["id"])
+        if "user_id" in user_data["subscription"] and isinstance(user_data["subscription"]["user_id"], uuid.UUID):
+            user_data["subscription"]["user_id"] = str(user_data["subscription"]["user_id"])
     
     return {
         **user_data,
@@ -114,7 +124,17 @@ def login(
     db.commit()
     
     # Create response with user data
-    user_data = UserSchema.from_orm(user).dict()
+    user_data = UserSchema.model_validate(user).model_dump()
+    
+    # Convert UUID objects to strings
+    if "id" in user_data and isinstance(user_data["id"], uuid.UUID):
+        user_data["id"] = str(user_data["id"])
+    
+    if "subscription" in user_data and user_data["subscription"]:
+        if "id" in user_data["subscription"] and isinstance(user_data["subscription"]["id"], uuid.UUID):
+            user_data["subscription"]["id"] = str(user_data["subscription"]["id"])
+        if "user_id" in user_data["subscription"] and isinstance(user_data["subscription"]["user_id"], uuid.UUID):
+            user_data["subscription"]["user_id"] = str(user_data["subscription"]["user_id"])
     
     return {
         **user_data,
