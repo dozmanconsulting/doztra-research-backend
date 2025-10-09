@@ -160,6 +160,22 @@ def create_tables(engine):
         Column('updated_at', DateTime, nullable=False, server_default=func.now(), onupdate=func.now())
     )
     
+    # Add usage_statistics table
+    usage_statistics = Table(
+        'usage_statistics',
+        metadata,
+        Column('id', PostgresUUID(as_uuid=True), primary_key=True, default=uuid.uuid4),
+        Column('user_id', PostgresUUID(as_uuid=True), ForeignKey('users.id', ondelete='CASCADE'), nullable=False),
+        Column('chat_messages', Integer, nullable=False, default=0),
+        Column('plagiarism_checks', Integer, nullable=False, default=0),
+        Column('prompts_generated', Integer, nullable=False, default=0),
+        Column('tokens_used', Integer, nullable=False, default=0),
+        Column('tokens_limit', Integer, nullable=False, default=100000),
+        Column('last_reset_date', DateTime, nullable=False, server_default=func.now()),
+        Column('created_at', DateTime, nullable=False, server_default=func.now()),
+        Column('updated_at', DateTime, nullable=False, server_default=func.now(), onupdate=func.now())
+    )
+    
     # Create tables
     try:
         for table in metadata.sorted_tables:
@@ -248,6 +264,50 @@ def ensure_last_login_column(engine):
         logger.error(f"Error ensuring last_login column: {e}")
         return False
 
+def ensure_usage_statistics_table(engine):
+    """Ensure the usage_statistics table exists."""
+    logger.info("Checking for usage_statistics table...")
+    
+    try:
+        with engine.connect() as conn:
+            # Check if table exists
+            result = conn.execute(text("""
+                SELECT EXISTS (
+                    SELECT 1 
+                    FROM information_schema.tables 
+                    WHERE table_name = 'usage_statistics'
+                )
+            """))
+            table_exists = result.scalar()
+            
+            if table_exists:
+                logger.info("usage_statistics table already exists")
+                return True
+            
+            # Create the table if it doesn't exist
+            logger.info("Creating usage_statistics table...")
+            conn.execute(text("""
+                CREATE TABLE usage_statistics (
+                    id UUID PRIMARY KEY,
+                    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    chat_messages INTEGER NOT NULL DEFAULT 0,
+                    plagiarism_checks INTEGER NOT NULL DEFAULT 0,
+                    prompts_generated INTEGER NOT NULL DEFAULT 0,
+                    tokens_used INTEGER NOT NULL DEFAULT 0,
+                    tokens_limit INTEGER NOT NULL DEFAULT 100000,
+                    last_reset_date TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT now(),
+                    created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT now(),
+                    updated_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT now()
+                )
+            """))
+            conn.commit()
+            
+            logger.info("Successfully created usage_statistics table")
+            return True
+    except SQLAlchemyError as e:
+        logger.error(f"Error ensuring usage_statistics table: {e}")
+        return False
+
 def check_tables(engine):
     """Check which tables exist in the database."""
     logger.info("Checking database tables...")
@@ -291,6 +351,9 @@ def main():
         
         # Ensure last_login column exists
         ensure_last_login_column(engine)
+        
+        # Ensure usage_statistics table exists
+        ensure_usage_statistics_table(engine)
         
         # Create admin user
         create_admin_user(session)
