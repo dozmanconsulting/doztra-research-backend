@@ -4,6 +4,11 @@ from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
 from typing import Any, Dict, Optional
 import uuid
+import logging
+
+# Set up logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # App imports
 from app.core.config import settings
@@ -115,60 +120,129 @@ def login(
     """
     OAuth2 compatible token login, get an access token for future requests.
     """
-    user = authenticate_user(db, form_data.username, form_data.password)
-    if not user:
+    logger.info(f"Login attempt for user: {form_data.username}")
+    logger.info(f"Form data: {form_data.__dict__}")
+    
+    try:
+        user = authenticate_user(db, form_data.username, form_data.password)
+        logger.info(f"Authentication result: {'Success' if user else 'Failed'}")
+        
+        if not user:
+            logger.warning(f"Login failed for user: {form_data.username} - Invalid credentials")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Incorrect email or password",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+    except Exception as e:
+        logger.error(f"Login error: {str(e)}")
+        logger.error(f"Error type: {type(e).__name__}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect email or password",
-            headers={"WWW-Authenticate": "Bearer"},
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Login error: {str(e)}",
         )
     
-    # Create access token
-    access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-    access_token = create_access_token(
-        data={"sub": user.id}, expires_delta=access_token_expires
-    )
-    
-    # Create refresh token
-    refresh_token_value = create_refresh_token(db, user.id)
-    
-    # Update last login time
-    user.last_login = datetime.utcnow()
-    db.commit()
+    try:
+        # Create access token
+        logger.info(f"Creating access token for user ID: {user.id}")
+        access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+        access_token = create_access_token(
+            data={"sub": user.id}, expires_delta=access_token_expires
+        )
+        logger.info("Access token created successfully")
+        
+        # Create refresh token
+        logger.info(f"Creating refresh token for user ID: {user.id}")
+        refresh_token_value = create_refresh_token(db, user.id)
+        logger.info("Refresh token created successfully")
+        
+        # Update last login time
+        logger.info(f"Updating last login time for user ID: {user.id}")
+        user.last_login = datetime.utcnow()
+        db.commit()
+        logger.info("Last login time updated successfully")
+    except Exception as e:
+        logger.error(f"Error during token creation: {str(e)}")
+        logger.error(f"Error type: {type(e).__name__}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Token creation error: {str(e)}",
+        )
     
     # Create a clean dictionary for the response
-    user_data = {
-        "id": str(user.id),
-        "email": user.email,
-        "name": user.name,
-        "role": user.role.value if hasattr(user.role, "value") else user.role,
-        "is_active": user.is_active,
-        "is_verified": user.is_verified,
-        "created_at": user.created_at.isoformat() if user.created_at else None,
-        "updated_at": user.updated_at.isoformat() if user.updated_at else None,
-        "last_login": user.last_login.isoformat() if user.last_login else None
-    }
+    logger.info("Creating user data dictionary for response")
+    try:
+        user_data = {
+            "id": str(user.id),
+            "email": user.email,
+            "name": user.name,
+            "role": user.role.value if hasattr(user.role, "value") else user.role,
+            "is_active": user.is_active,
+            "is_verified": user.is_verified,
+            "created_at": user.created_at.isoformat() if user.created_at else None,
+            "updated_at": user.updated_at.isoformat() if user.updated_at else None,
+            "last_login": user.last_login.isoformat() if user.last_login else None
+        }
+        logger.info("Basic user data created successfully")
+    except Exception as e:
+        logger.error(f"Error creating user data dictionary: {str(e)}")
+        logger.error(f"Error type: {type(e).__name__}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error creating response data: {str(e)}",
+        )
     
     # Add subscription data if available
-    if hasattr(user, "subscription") and user.subscription:
-        user_data["subscription"] = {
-            "id": str(user.subscription.id),
-            "user_id": str(user.subscription.user_id),
-            "plan": user.subscription.plan.value if hasattr(user.subscription.plan, "value") else user.subscription.plan,
-            "status": user.subscription.status.value if hasattr(user.subscription.status, "value") else user.subscription.status,
-            "is_active": user.subscription.is_active,
-            "created_at": user.subscription.created_at.isoformat() if user.subscription.created_at else None,
-            "updated_at": user.subscription.updated_at.isoformat() if user.subscription.updated_at else None,
-            "expires_at": user.subscription.expires_at.isoformat() if user.subscription.expires_at else None
-        }
+    try:
+        if hasattr(user, "subscription") and user.subscription:
+            logger.info(f"Adding subscription data for user ID: {user.id}")
+            user_data["subscription"] = {
+                "id": str(user.subscription.id),
+                "user_id": str(user.subscription.user_id),
+                "plan": user.subscription.plan.value if hasattr(user.subscription.plan, "value") else user.subscription.plan,
+                "status": user.subscription.status.value if hasattr(user.subscription.status, "value") else user.subscription.status,
+                "is_active": user.subscription.is_active,
+                "created_at": user.subscription.created_at.isoformat() if user.subscription.created_at else None,
+                "updated_at": user.subscription.updated_at.isoformat() if user.subscription.updated_at else None,
+                "expires_at": user.subscription.expires_at.isoformat() if user.subscription.expires_at else None
+            }
+            logger.info("Subscription data added successfully")
+        else:
+            logger.info(f"No subscription data found for user ID: {user.id}")
+    except Exception as e:
+        logger.error(f"Error adding subscription data: {str(e)}")
+        logger.error(f"Error type: {type(e).__name__}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        # Continue without subscription data rather than failing the request
     
-    return {
-        **user_data,
-        "access_token": access_token,
-        "refresh_token": refresh_token_value,
-        "token_type": "bearer",
-        "success": True
-    }
+    # Create final response
+    try:
+        logger.info("Creating final response with tokens")
+        response_data = {
+            **user_data,
+            "access_token": access_token,
+            "refresh_token": refresh_token_value,
+            "token_type": "bearer",
+            "success": True
+        }
+        logger.info("Login successful, returning response")
+        return response_data
+    except Exception as e:
+        logger.error(f"Error creating final response: {str(e)}")
+        logger.error(f"Error type: {type(e).__name__}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error creating final response: {str(e)}",
+        )
 
 
 @router.post("/refresh", response_model=Token)
