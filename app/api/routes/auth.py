@@ -19,23 +19,17 @@ from app.schemas.email import (
 )
 from app.schemas.message import Message
 from app.services.auth import (
-    authenticate_user, 
     create_access_token, 
     create_refresh_token,
     get_current_user,
-    get_password_hash
+    get_password_hash,
+    verify_password
 )
-from app.services.user import create_user, get_user_by_email, verify_user_email
-from app.utils.security import (
-    generate_verification_token,
-    verify_verification_token,
-    generate_password_reset_token,
-    verify_password_reset_token
-)
-from app.utils.email import send_verification_email, send_password_reset_email, send_welcome_email
+from app.utils.email import send_welcome_email, send_verification_email, send_password_reset_email
+from app.utils.security import generate_verification_token, verify_verification_token, generate_password_reset_token, verify_password_reset_token
+from app.utils.uuid_helper import convert_uuid_to_str
 
 router = APIRouter()
-
 
 @router.post("/register", response_model=UserWithToken, status_code=status.HTTP_201_CREATED)
 def register(
@@ -72,18 +66,11 @@ def register(
     # Send welcome email
     send_welcome_email(user.email, user.name)
     
+    # Convert user object to dict with UUIDs as strings
+    user_dict = convert_uuid_to_str(user)
+    
     # Create response
-    user_data = UserSchema.model_validate(user).model_dump()
-    
-    # Convert UUID objects to strings
-    if "id" in user_data and isinstance(user_data["id"], uuid.UUID):
-        user_data["id"] = str(user_data["id"])
-    
-    if "subscription" in user_data and user_data["subscription"]:
-        if "id" in user_data["subscription"] and isinstance(user_data["subscription"]["id"], uuid.UUID):
-            user_data["subscription"]["id"] = str(user_data["subscription"]["id"])
-        if "user_id" in user_data["subscription"] and isinstance(user_data["subscription"]["user_id"], uuid.UUID):
-            user_data["subscription"]["user_id"] = str(user_data["subscription"]["user_id"])
+    user_data = UserSchema.model_validate(user_dict).model_dump()
     
     return {
         **user_data,
@@ -123,18 +110,11 @@ def login(
     user.last_login = datetime.utcnow()
     db.commit()
     
+    # Convert user object to dict with UUIDs as strings
+    user_dict = convert_uuid_to_str(user)
+    
     # Create response with user data
-    user_data = UserSchema.model_validate(user).model_dump()
-    
-    # Convert UUID objects to strings
-    if "id" in user_data and isinstance(user_data["id"], uuid.UUID):
-        user_data["id"] = str(user_data["id"])
-    
-    if "subscription" in user_data and user_data["subscription"]:
-        if "id" in user_data["subscription"] and isinstance(user_data["subscription"]["id"], uuid.UUID):
-            user_data["subscription"]["id"] = str(user_data["subscription"]["id"])
-        if "user_id" in user_data["subscription"] and isinstance(user_data["subscription"]["user_id"], uuid.UUID):
-            user_data["subscription"]["user_id"] = str(user_data["subscription"]["user_id"])
+    user_data = UserSchema.model_validate(user_dict).model_dump()
     
     return {
         **user_data,
