@@ -66,11 +66,31 @@ def register(
     # Send welcome email
     send_welcome_email(user.email, user.name)
     
-    # Convert user object to dict with UUIDs as strings
-    user_dict = convert_uuid_to_str(user)
+    # Create a clean dictionary for the response
+    user_data = {
+        "id": str(user.id),
+        "email": user.email,
+        "name": user.name,
+        "role": user.role.value if hasattr(user.role, "value") else user.role,
+        "is_active": user.is_active,
+        "is_verified": user.is_verified,
+        "created_at": user.created_at.isoformat() if user.created_at else None,
+        "updated_at": user.updated_at.isoformat() if user.updated_at else None,
+        "last_login": user.last_login.isoformat() if user.last_login else None
+    }
     
-    # Create response
-    user_data = UserSchema.model_validate(user_dict).model_dump()
+    # Add subscription data if available
+    if hasattr(user, "subscription") and user.subscription:
+        user_data["subscription"] = {
+            "id": str(user.subscription.id),
+            "user_id": str(user.subscription.user_id),
+            "plan": user.subscription.plan.value if hasattr(user.subscription.plan, "value") else user.subscription.plan,
+            "status": user.subscription.status.value if hasattr(user.subscription.status, "value") else user.subscription.status,
+            "is_active": user.subscription.is_active,
+            "created_at": user.subscription.created_at.isoformat() if user.subscription.created_at else None,
+            "updated_at": user.subscription.updated_at.isoformat() if user.subscription.updated_at else None,
+            "expires_at": user.subscription.expires_at.isoformat() if user.subscription.expires_at else None
+        }
     
     return {
         **user_data,
@@ -110,11 +130,31 @@ def login(
     user.last_login = datetime.utcnow()
     db.commit()
     
-    # Convert user object to dict with UUIDs as strings
-    user_dict = convert_uuid_to_str(user)
+    # Create a clean dictionary for the response
+    user_data = {
+        "id": str(user.id),
+        "email": user.email,
+        "name": user.name,
+        "role": user.role.value if hasattr(user.role, "value") else user.role,
+        "is_active": user.is_active,
+        "is_verified": user.is_verified,
+        "created_at": user.created_at.isoformat() if user.created_at else None,
+        "updated_at": user.updated_at.isoformat() if user.updated_at else None,
+        "last_login": user.last_login.isoformat() if user.last_login else None
+    }
     
-    # Create response with user data
-    user_data = UserSchema.model_validate(user_dict).model_dump()
+    # Add subscription data if available
+    if hasattr(user, "subscription") and user.subscription:
+        user_data["subscription"] = {
+            "id": str(user.subscription.id),
+            "user_id": str(user.subscription.user_id),
+            "plan": user.subscription.plan.value if hasattr(user.subscription.plan, "value") else user.subscription.plan,
+            "status": user.subscription.status.value if hasattr(user.subscription.status, "value") else user.subscription.status,
+            "is_active": user.subscription.is_active,
+            "created_at": user.subscription.created_at.isoformat() if user.subscription.created_at else None,
+            "updated_at": user.subscription.updated_at.isoformat() if user.subscription.updated_at else None,
+            "expires_at": user.subscription.expires_at.isoformat() if user.subscription.expires_at else None
+        }
     
     return {
         **user_data,
