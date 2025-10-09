@@ -478,10 +478,66 @@ def ensure_user_preferences_columns(engine):
                 else:
                     logger.info(f"{column} column already exists in user_preferences table")
             
+            # Check if preferences column exists and is NOT NULL
+            result = conn.execute(text("""
+                SELECT is_nullable 
+                FROM information_schema.columns 
+                WHERE table_name = 'user_preferences' AND column_name = 'preferences'
+            """))
+            row = result.fetchone()
+            
+            if row and row[0] == 'NO':  # Column exists and is NOT NULL
+                logger.info("Making preferences column nullable...")
+                conn.execute(text("""
+                    ALTER TABLE user_preferences 
+                    ALTER COLUMN preferences DROP NOT NULL
+                """))
+                conn.commit()
+                logger.info("Successfully made preferences column nullable")
+            
             logger.info("All required columns exist in user_preferences table")
             return True
     except SQLAlchemyError as e:
         logger.error(f"Error ensuring user_preferences columns: {e}")
+        return False
+
+def ensure_refresh_tokens_table(engine):
+    """Ensure the refresh_tokens table exists."""
+    logger.info("Checking for refresh_tokens table...")
+    
+    try:
+        with engine.connect() as conn:
+            # Check if table exists
+            result = conn.execute(text("""
+                SELECT EXISTS (
+                    SELECT 1 
+                    FROM information_schema.tables 
+                    WHERE table_name = 'refresh_tokens'
+                )
+            """))
+            table_exists = result.scalar()
+            
+            if table_exists:
+                logger.info("refresh_tokens table already exists")
+                return True
+            
+            # Create the table if it doesn't exist
+            logger.info("Creating refresh_tokens table...")
+            conn.execute(text("""
+                CREATE TABLE refresh_tokens (
+                    id UUID PRIMARY KEY,
+                    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    token VARCHAR(255) NOT NULL,
+                    expires_at TIMESTAMP WITHOUT TIME ZONE NOT NULL,
+                    created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT now()
+                )
+            """))
+            conn.commit()
+            
+            logger.info("Successfully created refresh_tokens table")
+            return True
+    except SQLAlchemyError as e:
+        logger.error(f"Error ensuring refresh_tokens table: {e}")
         return False
 
 def check_tables(engine):
@@ -536,6 +592,9 @@ def main():
         
         # Ensure user_preferences columns exist
         ensure_user_preferences_columns(engine)
+        
+        # Ensure refresh_tokens table exists
+        ensure_refresh_tokens_table(engine)
         
         # Create admin user
         create_admin_user(session)

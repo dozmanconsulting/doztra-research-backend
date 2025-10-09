@@ -1,6 +1,7 @@
 from pydantic import BaseModel, EmailStr, Field, validator
 from typing import Optional, Dict, Any
 from datetime import datetime
+import uuid
 from app.models.user import SubscriptionPlan, SubscriptionStatus, UserRole, ModelTier
 from app.schemas.user_preferences import UserPreferences
 from app.schemas.usage_statistics import UsageStatistics
@@ -106,6 +107,19 @@ class User(UserInDBBase):
     subscription: Optional[Subscription] = None
     preferences: Optional[UserPreferences] = None
     usage: Optional[UsageStatistics] = None
+    
+    model_config = {
+        "from_attributes": True,
+        "json_encoders": {
+            uuid.UUID: str
+        }
+    }
+    
+    @validator("id", "subscription.id", "subscription.user_id", pre=True)
+    def convert_uuid_to_str(cls, v):
+        if isinstance(v, uuid.UUID):
+            return str(v)
+        return v
 
 
 class UserWithToken(UserBase):
