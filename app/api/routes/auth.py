@@ -42,6 +42,46 @@ from app.utils.uuid_helper import convert_uuid_to_str
 
 router = APIRouter()
 
+@router.get("/test")
+def test_endpoint():
+    """Simple test endpoint to check if the server is responding."""
+    logger.info("Test endpoint called")
+    return {"status": "ok", "message": "Server is running"}
+
+@router.post("/debug-auth")
+def debug_auth(request: dict = Body(...), db: Session = Depends(get_db)):
+    """Debug endpoint to test authentication directly."""
+    email = request.get("email")
+    password = request.get("password")
+    
+    if not email or not password:
+        return {"status": "error", "message": "Email and password are required"}
+    
+    logger.info(f"Debug auth attempt for email: {email}")
+    
+    try:
+        # Try to get user by email first
+        user = get_user_by_email(db, email=email)
+        logger.info(f"User found: {user is not None}")
+        
+        if user:
+            # Check password
+            is_password_valid = verify_password(password, user.hashed_password)
+            logger.info(f"Password valid: {is_password_valid}")
+            
+            if is_password_valid:
+                return {"status": "success", "message": "Authentication successful", "user_id": str(user.id)}
+            else:
+                return {"status": "error", "message": "Invalid password"}
+        else:
+            return {"status": "error", "message": "User not found"}
+    except Exception as e:
+        logger.error(f"Debug auth error: {str(e)}")
+        logger.error(f"Error type: {type(e).__name__}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        return {"status": "error", "message": f"Authentication error: {str(e)}"}
+
 @router.post("/register", response_model=UserWithToken, status_code=status.HTTP_201_CREATED)
 def register(
     user_in: UserCreate,
