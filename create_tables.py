@@ -408,6 +408,82 @@ def ensure_subscription_columns(engine):
         logger.error(f"Error ensuring subscription columns: {e}")
         return False
 
+def ensure_user_preferences_columns(engine):
+    """Ensure the user_preferences table has all required columns."""
+    logger.info("Checking user_preferences table columns...")
+    
+    try:
+        with engine.connect() as conn:
+            # Check if the table exists
+            result = conn.execute(text("""
+                SELECT EXISTS (
+                    SELECT 1 
+                    FROM information_schema.tables 
+                    WHERE table_name = 'user_preferences'
+                )
+            """))
+            table_exists = result.scalar()
+            
+            if not table_exists:
+                logger.info("Creating user_preferences table...")
+                conn.execute(text("""
+                    CREATE TABLE user_preferences (
+                        id UUID PRIMARY KEY,
+                        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                        theme VARCHAR(50) DEFAULT 'light',
+                        notifications BOOLEAN DEFAULT TRUE,
+                        default_model VARCHAR(50) DEFAULT 'gpt-3.5-turbo',
+                        created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT now(),
+                        updated_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT now()
+                    )
+                """))
+                conn.commit()
+                logger.info("Successfully created user_preferences table")
+                return True
+            
+            # Check if required columns exist
+            columns_to_check = ["theme", "notifications", "default_model"]
+            
+            for column in columns_to_check:
+                result = conn.execute(text(f"""
+                    SELECT EXISTS (
+                        SELECT 1 
+                        FROM information_schema.columns 
+                        WHERE table_name = 'user_preferences' AND column_name = '{column}'
+                    )
+                """))
+                column_exists = result.scalar()
+                
+                if not column_exists:
+                    logger.info(f"Adding {column} column to user_preferences table...")
+                    
+                    if column == "theme":
+                        conn.execute(text("""
+                            ALTER TABLE user_preferences 
+                            ADD COLUMN theme VARCHAR(50) DEFAULT 'light'
+                        """))
+                    elif column == "notifications":
+                        conn.execute(text("""
+                            ALTER TABLE user_preferences 
+                            ADD COLUMN notifications BOOLEAN DEFAULT TRUE
+                        """))
+                    elif column == "default_model":
+                        conn.execute(text("""
+                            ALTER TABLE user_preferences 
+                            ADD COLUMN default_model VARCHAR(50) DEFAULT 'gpt-3.5-turbo'
+                        """))
+                    
+                    conn.commit()
+                    logger.info(f"Successfully added {column} column to user_preferences table")
+                else:
+                    logger.info(f"{column} column already exists in user_preferences table")
+            
+            logger.info("All required columns exist in user_preferences table")
+            return True
+    except SQLAlchemyError as e:
+        logger.error(f"Error ensuring user_preferences columns: {e}")
+        return False
+
 def check_tables(engine):
     """Check which tables exist in the database."""
     logger.info("Checking database tables...")
@@ -457,6 +533,9 @@ def main():
         
         # Ensure subscription columns exist
         ensure_subscription_columns(engine)
+        
+        # Ensure user_preferences columns exist
+        ensure_user_preferences_columns(engine)
         
         # Create admin user
         create_admin_user(session)
