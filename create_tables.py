@@ -48,7 +48,23 @@ def create_enum_types(engine):
             else:
                 logger.info("subscriptionplan enum already exists")
             
-            # Add other enum types here if needed
+            # Check if modeltier enum exists
+            result = conn.execute(text("SELECT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'modeltier')"))
+            if not result.scalar():
+                conn.execute(text("CREATE TYPE modeltier AS ENUM ('gpt-3.5-turbo', 'gpt-4', 'gpt-4-turbo', 'gpt-4-32k', 'claude-3-opus')"))
+                conn.commit()
+                logger.info("Created modeltier enum")
+            else:
+                logger.info("modeltier enum already exists")
+                
+            # Check if subscriptionstatus enum exists
+            result = conn.execute(text("SELECT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'subscriptionstatus')"))
+            if not result.scalar():
+                conn.execute(text("CREATE TYPE subscriptionstatus AS ENUM ('active', 'canceled', 'expired')"))
+                conn.commit()
+                logger.info("Created subscriptionstatus enum")
+            else:
+                logger.info("subscriptionstatus enum already exists")
         
         return True
     except SQLAlchemyError as e:
@@ -83,9 +99,16 @@ def create_tables(engine):
         Column('id', PostgresUUID(as_uuid=True), primary_key=True, default=uuid.uuid4),
         Column('user_id', PostgresUUID(as_uuid=True), ForeignKey('users.id', ondelete='CASCADE'), nullable=False),
         Column('plan', String(50), nullable=False),
+        Column('status', String(50), nullable=False, default='ACTIVE'),
         Column('start_date', DateTime, nullable=False, server_default=func.now()),
-        Column('end_date', DateTime),
+        Column('expires_at', DateTime, nullable=True),
         Column('is_active', Boolean, nullable=False, default=True),
+        Column('auto_renew', Boolean, nullable=False, default=False),
+        Column('stripe_customer_id', String(255), nullable=True),
+        Column('stripe_subscription_id', String(255), nullable=True),
+        Column('payment_method_id', String(255), nullable=True),
+        Column('token_limit', Integer, nullable=True),
+        Column('max_model_tier', String(50), nullable=False, default='gpt-3.5-turbo'),
         Column('created_at', DateTime, nullable=False, server_default=func.now()),
         Column('updated_at', DateTime, nullable=False, server_default=func.now(), onupdate=func.now())
     )
