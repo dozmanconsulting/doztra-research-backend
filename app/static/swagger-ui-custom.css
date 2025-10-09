@@ -1,0 +1,137 @@
+/* Custom Swagger UI styling for Doztra Auth Service */
+
+:root {
+    --doztra-primary: #3366CC;
+    --doztra-secondary: #1A2542;
+    --doztra-accent: #60a5fa;
+    --doztra-text: #333333;
+    --doztra-light-bg: #f8fafc;
+    --doztra-dark-bg: #0a0d1a;
+    --doztra-border: #e5e7eb;
+}
+
+/* Header styling */
+.swagger-ui .topbar {
+    background-color: var(--doztra-secondary);
+    padding: 10px 0;
+}
+
+.swagger-ui .topbar .download-url-wrapper .select-label {
+    color: white;
+}
+
+/* Logo */
+.swagger-ui .topbar .topbar-wrapper img {
+    content: url('https://doztra.ai/logo.png');
+    height: 40px;
+}
+
+/* Main content */
+.swagger-ui .info {
+    margin: 30px 0;
+}
+
+.swagger-ui .info .title {
+    color: var(--doztra-secondary);
+    font-size: 36px;
+}
+
+.swagger-ui .info .title small.version-stamp {
+    background-color: var(--doztra-primary);
+}
+
+/* Operation blocks */
+.swagger-ui .opblock.opblock-get {
+    border-color: var(--doztra-primary);
+    background: rgba(51, 102, 204, 0.05);
+}
+
+.swagger-ui .opblock.opblock-post {
+    border-color: #4CAF50;
+    background: rgba(76, 175, 80, 0.05);
+}
+
+.swagger-ui .opblock.opblock-put {
+    border-color: #FF9800;
+    background: rgba(255, 152, 0, 0.05);
+}
+
+.swagger-ui .opblock.opblock-delete {
+    border-color: #F44336;
+    background: rgba(244, 67, 54, 0.05);
+}
+
+/* Operation headers */
+.swagger-ui .opblock .opblock-summary-method {
+    font-weight: bold;
+}
+
+.swagger-ui .opblock-summary-operation-id {
+    font-size: 14px;
+}
+
+/* Models */
+.swagger-ui .model-box {
+    background: var(--doztra-light-bg);
+    border-radius: 4px;
+}
+
+/* Buttons */
+.swagger-ui .btn.execute {
+    background-color: var(--doztra-primary);
+    color: white;
+    border-color: var(--doztra-primary);
+}
+
+.swagger-ui .btn.execute:hover {
+    background-color: var(--doztra-secondary);
+    border-color: var(--doztra-secondary);
+}
+
+/* Authorize button */
+.swagger-ui .auth-wrapper .authorize {
+    color: var(--doztra-primary);
+    border-color: var(--doztra-primary);
+}
+
+.swagger-ui .auth-wrapper .authorize svg {
+    fill: var(--doztra-primary);
+}
+
+/* Response codes */
+.swagger-ui .responses-table .response-col_status {
+    font-weight: bold;
+}
+
+.swagger-ui .response-col_status .response-undocumented {
+    font-size: 11px;
+    font-weight: normal;
+}
+
+/* Schema */
+.swagger-ui .model-title {
+    color: var(--doztra-secondary);
+}
+
+/* Footer */
+.swagger-ui .info .footer {
+    margin-top: 30px;
+    text-align: center;
+    color: #666;
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+    .swagger-ui {
+        color: #e1e1e6;
+        background-color: var(--doztra-dark-bg);
+    }
+    
+    .swagger-ui .info .title {
+        color: white;
+    }
+    
+    .swagger-ui .model-box {
+        background: rgba(255, 255, 255, 0.05);
+    }
+}

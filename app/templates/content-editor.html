@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Content Editor</title>
+    <link rel="stylesheet" href="/static/css/content-editor.css">
+</head>
+<body>
+    <div class="content-editor-container">
+        <div class="editor-toolbar">
+            <div class="editor-title">
+                <h2 id="section-title">Section Title</h2>
+            </div>
+            <div class="editor-actions">
+                <button id="view-tab-btn" class="btn btn-secondary">View</button>
+                <button id="edit-tab-btn" class="btn btn-secondary">Edit</button>
+                <button id="save-changes-btn" class="btn btn-primary">Save Changes</button>
+                <button id="download-btn" class="btn btn-secondary">Download</button>
+                <button id="send-to-chat-btn" class="btn btn-secondary">Send to Chat</button>
+                <button id="close-btn" class="btn btn-secondary">Close</button>
+            </div>
+        </div>
+        
+        <div class="editor-tabs">
+            <div id="view-tab" class="editor-tab active">View</div>
+            <div id="edit-tab" class="editor-tab">Edit</div>
+            <div id="history-tab" class="editor-tab">History</div>
+        </div>
+        
+        <div id="view-content" class="content-view">
+            <!-- Rendered markdown content will be shown here -->
+        </div>
+        
+        <div id="edit-content" class="content-editor-wrapper" style="display: none;">
+            <div class="markdown-toolbar">
+                <button title="Bold" onclick="insertMarkdown('**', '**')"><strong>B</strong></button>
+                <button title="Italic" onclick="insertMarkdown('*', '*')"><em>I</em></button>
+                <button title="Heading 1" onclick="insertMarkdown('# ', '')">H1</button>
+                <button title="Heading 2" onclick="insertMarkdown('## ', '')">H2</button>
+                <button title="Heading 3" onclick="insertMarkdown('### ', '')">H3</button>
+                <button title="Link" onclick="insertMarkdown('[', '](url)')">Link</button>
+                <button title="List" onclick="insertMarkdown('- ', '')">List</button>
+                <button title="Code" onclick="insertMarkdown('```\n', '\n```')">Code</button>
+                <button title="Quote" onclick="insertMarkdown('> ', '')">Quote</button>
+            </div>
+            <textarea id="content-editor" class="content-editor" placeholder="Enter your content here..."></textarea>
+        </div>
+        
+        <div id="history-content" class="version-history" style="display: none;">
+            <h3>Version History</h3>
+            <div id="version-list">
+                <!-- Version history will be populated here -->
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/content-editor.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script>
+        // Initialize the editor
+        document.addEventListener('DOMContentLoaded', function() {
+            // Get query parameters
+            const urlParams = new URLSearchParams(window.location.search);
+            const projectId = urlParams.get('projectId');
+            const sectionTitle = urlParams.get('sectionTitle');
+            
+            // Set section title
+            document.getElementById('section-title').textContent = sectionTitle || 'Content Editor';
+            
+            // Initialize editor
+            const editor = new ContentEditor({
+                apiBaseUrl: '/api/research',
+                token: localStorage.getItem('token'),
+                projectId: projectId,
+                sectionTitle: sectionTitle,
+                onSaveSuccess: function(data) {
+                    console.log('Content saved successfully:', data);
+                    // Update view with new content
+                    document.getElementById('view-content').innerHTML = marked.parse(data.content);
+                },
+                onSaveError: function(error) {
+                    console.error('Error saving content:', error);
+                }
+            });
+            
+            // Initialize editor with textarea element
+            editor.init(document.getElementById('content-editor'));
+            
+            // Load content
+            loadContent(projectId, sectionTitle);
+            
+            // Tab switching
+            document.getElementById('view-tab').addEventListener('click', function() {
+                switchTab('view');
+            });
+            
+            document.getElementById('edit-tab').addEventListener('click', function() {
+                switchTab('edit');
+            });
+            
+            document.getElementById('history-tab').addEventListener('click', function() {
+                switchTab('history');
+                loadVersionHistory(projectId, sectionTitle);
+            });
+            
+            // Button actions
+            document.getElementById('view-tab-btn').addEventListener('click', function() {
+                switchTab('view');
+            });
+            
+            document.getElementById('edit-tab-btn').addEventListener('click', function() {
+                switchTab('edit');
+            });
+            
+            document.getElementById('download-btn').addEventListener('click', function() {
+                downloadContent(sectionTitle);
+            });
+            
+            document.getElementById('send-to-chat-btn').addEventListener('click', function() {
+                sendToChat();
+            });
+            
+            document.getElementById('close-btn').addEventListener('click', function() {
+                closeEditor();
+            });
+        });
+        
+        // Switch between tabs
+        function switchTab(tabName) {
+            // Hide all content areas
+            document.getElementById('view-content').style.display = 'none';
+            document.getElementById('edit-content').style.display = 'none';
+            document.getElementById('history-content').style.display = 'none';
+            
+            // Deactivate all tabs
+            document.querySelectorAll('.editor-tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            // Show selected content and activate tab
+            document.getElementById(`${tabName}-content`).style.display = 'block';
+            document.getElementById(`${tabName}-tab`).classList.add('active');
+        }
+        
+        // Load content from API
+        async function loadContent(projectId, sectionTitle) {
+            try {
+                const response = await fetch(`/api/research/projects/${projectId}/content/${encodeURIComponent(sectionTitle)}`, {
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`Failed to load content: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                
+                // Set content in editor
+                document.getElementById('content-editor').value = data.content;
+                
+                // Render markdown in view mode
+                document.getElementById('view-content').innerHTML = marked.parse(data.content);
+                
+            } catch (error) {
+                console.error('Error loading content:', error);
+                document.getElementById('view-content').innerHTML = `<p class="error">Error loading content: ${error.message}</p>`;
+            }
+        }
+        
+        // Load version history
+        async function loadVersionHistory(projectId, sectionTitle) {
+            try {
+                const response = await fetch(`/api/research/projects/${projectId}/content?section_title=${encodeURIComponent(sectionTitle)}`, {
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`Failed to load version history: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                
+                // Filter content items for this section
+                const versions = data.items.filter(item => item.section_title === sectionTitle);
+                
+                // Sort by version (descending)
+                versions.sort((a, b) => b.version - a.version);
+                
+                // Render version history
+                const versionList = document.getElementById('version-list');
+                versionList.innerHTML = '';
+                
+                if (versions.length === 0) {
+                    versionList.innerHTML = '<p>No version history available.</p>';
+                    return;
+                }
+                
+                versions.forEach(version => {
+                    const versionItem = document.createElement('div');
+                    versionItem.className = 'version-item';
+                    
+                    const versionInfo = document.createElement('div');
+                    versionInfo.className = 'version-info';
+                    
+                    const versionNumber = document.createElement('div');
+                    versionNumber.className = 'version-number';
+                    versionNumber.textContent = `Version ${version.version}`;
+                    
+                    const versionDate = document.createElement('div');
+                    versionDate.className = 'version-date';
+                    versionDate.textContent = new Date(version.updated_at).toLocaleString();
+                    
+                    versionInfo.appendChild(versionNumber);
+                    versionInfo.appendChild(versionDate);
+                    
+                    const versionActions = document.createElement('div');
+                    versionActions.className = 'version-actions';
+                    
+                    const viewButton = document.createElement('button');
+                    viewButton.className = 'btn btn-secondary';
+                    viewButton.textContent = 'View';
+                    viewButton.addEventListener('click', () => {
+                        loadSpecificVersion(projectId, version.id);
+                    });
+                    
+                    const restoreButton = document.createElement('button');
+                    restoreButton.className = 'btn btn-primary';
+                    restoreButton.textContent = 'Restore';
+                    restoreButton.addEventListener('click', () => {
+                        restoreVersion(projectId, version.id, sectionTitle);
+                    });
+                    
+                    versionActions.appendChild(viewButton);
+                    versionActions.appendChild(restoreButton);
+                    
+                    versionItem.appendChild(versionInfo);
+                    versionItem.appendChild(versionActions);
+                    
+                    versionList.appendChild(versionItem);
+                });
+                
+            } catch (error) {
+                console.error('Error loading version history:', error);
+                document.getElementById('version-list').innerHTML = `<p class="error">Error loading version history: ${error.message}</p>`;
+            }
+        }
+        
+        // Load specific version
+        async function loadSpecificVersion(projectId, contentId) {
+            try {
+                const response = await fetch(`/api/research/projects/${projectId}/content/${contentId}`, {
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`Failed to load version: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                
+                // Show content in view mode
+                document.getElementById('view-content').innerHTML = marked.parse(data.content);
+                switchTab('view');
+                
+            } catch (error) {
+                console.error('Error loading version:', error);
+                alert(`Error loading version: ${error.message}`);
+            }
+        }
+        
+        // Restore version
+        async function restoreVersion(projectId, contentId, sectionTitle) {
+            try {
+                // First get the content
+                const response = await fetch(`/api/research/projects/${projectId}/content/${contentId}`, {
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`Failed to load version: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                
+                // Update editor with this content
+                document.getElementById('content-editor').value = data.content;
+                
+                // Save as a new version
+                const editor = new ContentEditor({
+                    apiBaseUrl: '/api/research',
+                    token: localStorage.getItem('token'),
+                    projectId: projectId,
+                    sectionTitle: sectionTitle
+                });
+                
+                editor.init(document.getElementById('content-editor'));
+                await editor.saveChanges();
+                
+                // Reload content and switch to view
+                loadContent(projectId, sectionTitle);
+                switchTab('view');
+                
+                alert('Version restored successfully!');
+                
+            } catch (error) {
+                console.error('Error restoring version:', error);
+                alert(`Error restoring version: ${error.message}`);
+            }
+        }
+        
+        // Download content as markdown
+        function downloadContent(sectionTitle) {
+            const content = document.getElementById('content-editor').value;
+            const blob = new Blob([content], { type: 'text/markdown' });
+            const url = URL.createObjectURL(blob);
+            
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${sectionTitle.replace(/\s+/g, '-').toLowerCase()}.md`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+        
+        // Send to chat
+        function sendToChat() {
+            const content = document.getElementById('content-editor').value;
+            // This function would integrate with your chat system
+            // For now, we'll just show an alert
+            alert('This feature will send the content to chat for further discussion.');
+            
+            // In a real implementation, you might use window.postMessage or another
+            // method to communicate with the parent window/frame
+            if (window.opener) {
+                window.opener.postMessage({
+                    type: 'SEND_TO_CHAT',
+                    content: content
+                }, '*');
+            }
+        }
+        
+        // Close editor
+        function closeEditor() {
+            // If in iframe or popup, close it
+            if (window.frameElement) {
+                window.parent.closeEditorFrame();
+            } else if (window.opener) {
+                window.close();
+            } else {
+                // If not in iframe or popup, redirect to project page
+                const urlParams = new URLSearchParams(window.location.search);
+                const projectId = urlParams.get('projectId');
+                window.location.href = `/projects/${projectId}`;
+            }
+        }
+        
+        // Insert markdown formatting
+        function insertMarkdown(prefix, suffix) {
+            const editor = document.getElementById('content-editor');
+            const start = editor.selectionStart;
+            const end = editor.selectionEnd;
+            const selectedText = editor.value.substring(start, end);
+            
+            const beforeText = editor.value.substring(0, start);
+            const afterText = editor.value.substring(end);
+            
+            editor.value = beforeText + prefix + selectedText + suffix + afterText;
+            
+            // Set cursor position
+            if (selectedText.length > 0) {
+                editor.selectionStart = start + prefix.length;
+                editor.selectionEnd = start + prefix.length + selectedText.length;
+            } else {
+                editor.selectionStart = editor.selectionEnd = start + prefix.length;
+            }
+            
+            editor.focus();
+        }
+    </script>
+</body>
+</html>

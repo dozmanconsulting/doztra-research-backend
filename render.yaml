@@ -1,0 +1,56 @@
+services:
+  # Web service
+  - type: web
+    name: doztra-auth-service
+    env: python
+    region: oregon
+    plan: free
+    pythonVersion: 3.11.0
+    buildCommand: "./render_build.sh"
+    startCommand: "uvicorn app.main:app --host 0.0.0.0 --port $PORT"
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.0
+      - key: DATABASE_URL
+        fromDatabase:
+          name: doztra-auth-db
+          property: connectionString
+      - key: SECRET_KEY
+        generateValue: true
+      - key: ACCESS_TOKEN_EXPIRE_MINUTES
+        value: 10080
+      - key: REFRESH_TOKEN_EXPIRE_MINUTES
+        value: 43200
+      - key: CORS_ORIGINS
+        value: '["https://doztra.onrender.com", "https://doztra.ai"]'
+      - key: SMTP_TLS
+        value: "True"
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false
+      - key: EMAILS_FROM_EMAIL
+        value: "noreply@doztra.ai"
+      - key: EMAILS_FROM_NAME
+        value: "Doztra AI"
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: OPENAI_API_URL
+        value: "https://api.openai.com/v1"
+      - key: DEFAULT_AI_MODEL
+        value: "gpt-3.5-turbo"
+      - key: MAX_TOKENS_PER_REQUEST
+        value: "4000"
+      - key: PORT
+        value: 10000
+
+  # PostgreSQL database
+databases:
+  - name: doztra-auth-db
+    databaseName: doztra_auth
+    user: doztra_admin
+    plan: free
