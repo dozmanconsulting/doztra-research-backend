@@ -25,6 +25,8 @@ class Settings(BaseSettings):
         "http://localhost:3000",  # Frontend dev server
         "http://localhost:8000",  # Backend dev server
         "https://doztra.ai",      # Production frontend
+        "https://doztra.netlify.app",  # Netlify deployment
+        "https://www.doztra.netlify.app",  # Netlify with www subdomain
     ]
     
     # Email settings

@@ -2,10 +2,8 @@ from fastapi import FastAPI, Request, status, Depends, Header, Cookie, HTTPExcep
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.docs import get_swagger_ui_html, get_redoc_html
 from fastapi.openapi.utils import get_openapi
-from fastapi import FastAPI, Depends, HTTPException, Request, status
 from fastapi.responses import JSONResponse, HTMLResponse, RedirectResponse
 from app.models.user import UserRole
-from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.exceptions import RequestValidationError
@@ -152,9 +150,17 @@ optional_security = OptionalHTTPBearer(auto_error=False)
 # OpenAPI schema endpoint - public for Swagger UI to work
 @app.get("/api/openapi.json", include_in_schema=False)
 async def get_openapi_endpoint():
-    return JSONResponse(content=app.openapi())
+    try:
+        schema = app.openapi()
+        return JSONResponse(content=schema)
+    except Exception as e:
+        logger.error(f"Error generating OpenAPI schema: {e}")
+        return JSONResponse(
+            content={"detail": "Error generating API schema"},
+            status_code=500
+        )
 
-# Custom Swagger UI route (admin only) - GET method
+# Custom Swagger UI route - GET method (public access)
 @app.get("/docs", include_in_schema=False)
 async def custom_swagger_ui_html_get(request: Request):
     return get_swagger_ui_html(
@@ -339,6 +345,14 @@ async def admin_login_page(request: Request):
         html_content = f.read()
     
     return HTMLResponse(content=html_content)
+
+# Admin dashboard page
+@app.get("/admin/dashboard", include_in_schema=False)
+async def admin_dashboard_page(request: Request):
+    """
+    Serve the admin dashboard page.
+    """
+    return templates.TemplateResponse("admin-dashboard.html", {"request": request})
 
 # Health check endpoint
 @app.get("/health", tags=["Health"])

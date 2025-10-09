@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard - Doztra Auth Service</title>
+    <style>
+        :root {
+            --primary-color: #3366CC;
+            --secondary-color: #1A2542;
+            --accent-color: #60a5fa;
+            --text-color: #333333;
+            --light-bg: #f8fafc;
+            --dark-bg: #0a0d1a;
+            --border-color: #e5e7eb;
+            --card-bg: white;
+            --card-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+            line-height: 1.6;
+            color: var(--text-color);
+            margin: 0;
+            padding: 0;
+            background-color: var(--light-bg);
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+        
+        header {
+            background-color: var(--secondary-color);
+            color: white;
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .logo {
+            font-size: 1.5rem;
+            font-weight: bold;
+        }
+        
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 2rem auto;
+            padding: 0 2rem;
+            flex: 1;
+        }
+        
+        .dashboard-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+        
+        .stat-card {
+            background-color: var(--card-bg);
+            border-radius: 8px;
+            box-shadow: var(--card-shadow);
+            padding: 1.5rem;
+            text-align: center;
+        }
+        
+        .stat-value {
+            font-size: 2rem;
+            font-weight: bold;
+            color: var(--primary-color);
+            margin: 0.5rem 0;
+        }
+        
+        .stat-label {
+            color: #666;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .data-card {
+            background-color: var(--card-bg);
+            border-radius: 8px;
+            box-shadow: var(--card-shadow);
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+        
+        .card-title {
+            margin-top: 0;
+            color: var(--secondary-color);
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 0.75rem;
+            margin-bottom: 1rem;
+        }
+        
+        .button {
+            display: inline-block;
+            background-color: var(--primary-color);
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            text-decoration: none;
+            font-weight: 500;
+            border: none;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        
+        .button:hover {
+            background-color: var(--secondary-color);
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        th, td {
+            padding: 0.75rem;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        th {
+            background-color: #f1f5f9;
+            font-weight: 600;
+        }
+        
+        tr:hover {
+            background-color: #f9fafb;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 2rem;
+            color: #666;
+        }
+        
+        .error {
+            background-color: #fee2e2;
+            border-left: 4px solid #ef4444;
+            color: #b91c1c;
+            padding: 1rem;
+            margin-bottom: 1.5rem;
+            border-radius: 4px;
+        }
+        
+        footer {
+            margin-top: auto;
+            padding: 1.5rem 0;
+            text-align: center;
+            color: #666;
+            border-top: 1px solid var(--border-color);
+            font-size: 0.9rem;
+        }
+        
+        @media (prefers-color-scheme: dark) {
+            body {
+                background-color: var(--dark-bg);
+                color: #e1e1e6;
+            }
+            
+            .stat-card, .data-card {
+                background-color: #141625;
+            }
+            
+            .card-title {
+                color: white;
+                border-bottom-color: #2d3748;
+            }
+            
+            th {
+                background-color: #1e2032;
+            }
+            
+            th, td {
+                border-bottom-color: #2d3748;
+            }
+            
+            tr:hover {
+                background-color: #1a1c2c;
+            }
+            
+            .stat-label {
+                color: #9ca3af;
+            }
+            
+            footer {
+                color: #9ca3af;
+                border-top-color: #2d3748;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="logo">Doztra Admin Dashboard</div>
+        <div class="user-info">
+            <span id="user-name">Admin User</span>
+            <a href="/api/auth/logout" class="button">Logout</a>
+        </div>
+    </header>
+    
+    <div class="container">
+        <div class="dashboard-header">
+            <h1>Admin Dashboard</h1>
+            <div>
+                <a href="/docs" class="button">API Documentation</a>
+            </div>
+        </div>
+        
+        <div id="error-container" class="error" style="display: none;">
+            An error occurred while loading dashboard data.
+        </div>
+        
+        <div class="stats-grid" id="stats-container">
+            <div class="stat-card">
+                <div class="stat-label">Total Users</div>
+                <div class="stat-value" id="total-users">-</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Active Users</div>
+                <div class="stat-value" id="active-users">-</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Verified Users</div>
+                <div class="stat-value" id="verified-users">-</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Admin Users</div>
+                <div class="stat-value" id="admin-users">-</div>
+            </div>
+        </div>
+        
+        <div class="data-card">
+            <h2 class="card-title">Recent Users</h2>
+            <div id="users-table-container">
+                <div class="loading">Loading user data...</div>
+            </div>
+        </div>
+        
+        <div class="data-card">
+            <h2 class="card-title">System Status</h2>
+            <div id="system-status-container">
+                <div class="loading">Loading system status...</div>
+            </div>
+        </div>
+    </div>
+    
+    <footer>
+        <div>© 2025 Doztra AI. All rights reserved.</div>
+        <div>Version 1.0.0</div>
+    </footer>
+    
+    <script>
+        // Get token from localStorage or sessionStorage
+        const token = sessionStorage.getItem('admin_token') || localStorage.getItem('admin_token');
+        
+        // Function to fetch dashboard data
+        async function fetchDashboardData() {
+            try {
+                const response = await fetch('/api/admin/dashboard', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                updateDashboard(data);
+            } catch (error) {
+                console.error('Error fetching dashboard data:', error);
+                document.getElementById('error-container').style.display = 'block';
+                document.getElementById('error-container').textContent = 
+                    `Error loading dashboard data: ${error.message}. Please ensure you're logged in as an admin.`;
+            }
+        }
+        
+        // Function to fetch users data
+        async function fetchUsersData() {
+            try {
+                const response = await fetch('/api/admin/users?limit=10', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const users = await response.json();
+                updateUsersTable(users);
+            } catch (error) {
+                console.error('Error fetching users data:', error);
+                document.getElementById('users-table-container').innerHTML = 
+                    `<div class="error">Error loading user data: ${error.message}</div>`;
+            }
+        }
+        
+        // Function to update dashboard with fetched data
+        function updateDashboard(data) {
+            document.getElementById('total-users').textContent = data.user_counts.total || 0;
+            document.getElementById('active-users').textContent = data.user_counts.active || 0;
+            document.getElementById('verified-users').textContent = data.user_counts.verified || 0;
+            document.getElementById('admin-users').textContent = data.user_counts.admin || 0;
+            
+            // Update system status
+            const systemStatusContainer = document.getElementById('system-status-container');
+            systemStatusContainer.innerHTML = `
+                <table>
+                    <tr>
+                        <th>Metric</th>
+                        <th>Value</th>
+                    </tr>
+                    <tr>
+                        <td>API Version</td>
+                        <td>${data.system_info.version || 'Unknown'}</td>
+                    </tr>
+                    <tr>
+                        <td>Server Time</td>
+                        <td>${new Date(data.system_info.server_time).toLocaleString()}</td>
+                    </tr>
+                    <tr>
+                        <td>Database Status</td>
+                        <td>${data.system_info.database_status || 'Unknown'}</td>
+                    </tr>
+                </table>
+            `;
+        }
+        
+        // Function to update users table with fetched data
+        function updateUsersTable(users) {
+            const usersTableContainer = document.getElementById('users-table-container');
+            
+            if (!users || users.length === 0) {
+                usersTableContainer.innerHTML = '<p>No users found.</p>';
+                return;
+            }
+            
+            let tableHTML = `
+                <table>
+                    <tr>
+                        <th>Name</th>
+                        <th>Email</th>
+                        <th>Role</th>
+                        <th>Status</th>
+                        <th>Created</th>
+                    </tr>
+            `;
+            
+            users.forEach(user => {
+                tableHTML += `
+                    <tr>
+                        <td>${user.name || 'N/A'}</td>
+                        <td>${user.email || 'N/A'}</td>
+                        <td>${user.role || 'user'}</td>
+                        <td>${user.is_active ? 'Active' : 'Inactive'}</td>
+                        <td>${new Date(user.created_at).toLocaleDateString()}</td>
+                    </tr>
+                `;
+            });
+            
+            tableHTML += '</table>';
+            usersTableContainer.innerHTML = tableHTML;
+        }
+        
+        // Check if token exists
+        if (!token) {
+            document.getElementById('error-container').style.display = 'block';
+            document.getElementById('error-container').textContent = 
+                'You are not logged in. Please log in as an admin to view this dashboard.';
+        } else {
+            // Fetch data when page loads
+            fetchDashboardData();
+            fetchUsersData();
+        }
+    </script>
+</body>
+</html>
