@@ -47,10 +47,16 @@ app = FastAPI(
     terms_of_service="https://doztra.ai/terms",
 )
 
+# Import our custom CORS middleware
+from app.middleware.cors import CustomCORSMiddleware
+
 # Set up CORS middleware
+app.add_middleware(CustomCORSMiddleware)
+
+# Keep the original CORS middleware as a fallback
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS,
+    allow_origins=settings.CORS_ORIGINS + ["https://doztra-ai.netlify.app"],  # Explicitly add the domain
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
