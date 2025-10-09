@@ -2,9 +2,10 @@ from fastapi import APIRouter, Depends, HTTPException, status, Body
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
-from typing import Any
+from typing import Any, Dict, Optional
 import uuid
 
+# App imports
 from app.core.config import settings
 from app.db.session import get_db
 from app.models.user import User, RefreshToken
@@ -18,14 +19,18 @@ from app.schemas.email import (
     PasswordResetConfirm
 )
 from app.schemas.message import Message
+
+# Service imports
+from app.services.user import get_user_by_email, create_user, authenticate_user
 from app.services.auth import (
-    create_access_token, 
+    create_access_token,
     create_refresh_token,
     get_current_user,
     get_password_hash,
     verify_password
 )
-from app.services.user import get_user_by_email, create_user
+
+# Utility imports
 from app.utils.email import send_welcome_email, send_verification_email, send_password_reset_email
 from app.utils.security import generate_verification_token, verify_verification_token, generate_password_reset_token, verify_password_reset_token
 from app.utils.uuid_helper import convert_uuid_to_str
