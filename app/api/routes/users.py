@@ -10,6 +10,7 @@ from app.schemas.usage_statistics import UsageResponse
 from app.services.auth import get_current_user, get_current_active_verified_user
 from app.services.user import get_user_by_id, update_user, update_subscription, get_users
 from app.services.usage_statistics import get_usage_response
+from app.utils.uuid_helper import convert_uuid_to_str
 
 router = APIRouter()
 
@@ -21,7 +22,9 @@ def read_current_user(
     """
     Get current user.
     """
-    return current_user
+    # Convert UUID objects to strings
+    user_dict = convert_uuid_to_str(current_user)
+    return user_dict
 
 
 @router.put("/me", response_model=UserSchema)
@@ -34,7 +37,9 @@ def update_current_user(
     Update current user.
     """
     user = update_user(db, current_user, user_in)
-    return user
+    # Convert UUID objects to strings
+    user_dict = convert_uuid_to_str(user)
+    return user_dict
 
 
 @router.get("/{user_id}", response_model=UserSchema)
@@ -59,7 +64,9 @@ def read_user_by_id(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="User not found",
         )
-    return user
+    # Convert UUID objects to strings
+    user_dict = convert_uuid_to_str(user)
+    return user_dict
 
 
 @router.put("/me/subscription", response_model=UserSchema)
@@ -101,7 +108,9 @@ def update_user_subscription(
         stripe_customer_id=stripe_customer_id,
         stripe_subscription_id=stripe_subscription_id
     )
-    return user
+    # Convert UUID objects to strings
+    user_dict = convert_uuid_to_str(user)
+    return user_dict
 
 
 @router.get("/me/subscription", response_model=Subscription)
@@ -117,7 +126,9 @@ def get_user_subscription(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Subscription not found"
         )
-    return current_user.subscription
+    # Convert UUID objects to strings
+    subscription_dict = convert_uuid_to_str(current_user.subscription)
+    return subscription_dict
 
 
 @router.get("/me/usage", response_model=UsageResponse)
