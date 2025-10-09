@@ -29,7 +29,7 @@ class ResearchProjectUpdate(BaseModel):
 class ResearchProject(ResearchProjectBase):
     id: str
     user_id: str
-    status: ProjectStatus
+    status: str  # Changed from ProjectStatus to str to avoid validation issues
     created_at: datetime
     updated_at: datetime
     project_metadata: Optional[Dict[str, Any]] = None
