@@ -25,6 +25,7 @@ from app.services.auth import (
     get_password_hash,
     verify_password
 )
+from app.services.user import get_user_by_email, create_user
 from app.utils.email import send_welcome_email, send_verification_email, send_password_reset_email
 from app.utils.security import generate_verification_token, verify_verification_token, generate_password_reset_token, verify_password_reset_token
 from app.utils.uuid_helper import convert_uuid_to_str
