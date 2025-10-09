@@ -38,15 +38,17 @@ def create_enum_types(engine):
     logger.info("Creating enum types...")
     
     try:
-        # Check if subscriptionplan enum exists
-        result = engine.execute(text("SELECT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'subscriptionplan')"))
-        if not result.scalar():
-            engine.execute(text("CREATE TYPE subscriptionplan AS ENUM ('FREE', 'BASIC', 'PROFESSIONAL')"))
-            logger.info("Created subscriptionplan enum")
-        else:
-            logger.info("subscriptionplan enum already exists")
+        with engine.connect() as conn:
+            # Check if subscriptionplan enum exists
+            result = conn.execute(text("SELECT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'subscriptionplan')"))
+            if not result.scalar():
+                conn.execute(text("CREATE TYPE subscriptionplan AS ENUM ('FREE', 'BASIC', 'PROFESSIONAL')"))
+                conn.commit()
+                logger.info("Created subscriptionplan enum")
+            else:
+                logger.info("subscriptionplan enum already exists")
             
-        # Add other enum types here if needed
+            # Add other enum types here if needed
         
         return True
     except SQLAlchemyError as e:
@@ -216,23 +218,24 @@ def check_tables(engine):
     logger.info("Checking database tables...")
     
     try:
-        result = engine.execute(text("""
-        SELECT table_name 
-        FROM information_schema.tables 
-        WHERE table_schema = 'public'
-        ORDER BY table_name
-        """))
-        
-        tables = [row[0] for row in result]
-        
-        if tables:
-            logger.info("Tables in database:")
-            for table in tables:
-                logger.info(f"  - {table}")
-        else:
-            logger.info("No tables found in database")
+        with engine.connect() as conn:
+            result = conn.execute(text("""
+            SELECT table_name 
+            FROM information_schema.tables 
+            WHERE table_schema = 'public'
+            ORDER BY table_name
+            """))
             
-        return tables
+            tables = [row[0] for row in result]
+            
+            if tables:
+                logger.info("Tables in database:")
+                for table in tables:
+                    logger.info(f"  - {table}")
+            else:
+                logger.info("No tables found in database")
+                
+            return tables
     except SQLAlchemyError as e:
         logger.error(f"Error checking tables: {e}")
         return []
