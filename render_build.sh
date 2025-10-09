@@ -35,6 +35,15 @@ else
     # Continue even if migrations fail
 fi
 
+# Create tables explicitly using create_tables.py
+echo "Creating tables explicitly..."
+if python create_tables.py; then
+    echo "Tables created successfully."
+else
+    echo "Warning: Table creation failed. Continuing with deployment..."
+    # Continue even if table creation fails
+fi
+
 # Set up the database with initial data
 echo "Setting up database with initial data..."
 if python setup_render_db.py; then
