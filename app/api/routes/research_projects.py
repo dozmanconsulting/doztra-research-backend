@@ -1,11 +1,13 @@
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, Path
 from sqlalchemy.orm import Session
+import uuid
 
 from app.db.session import get_db
 from app.services.auth import get_current_active_user as get_current_user
 from app.models.user import User
 from app.models.research_project import ResearchProject, ProjectStatus
+from app.utils.uuid_helper import convert_uuid_to_str
 from app.schemas.research_project import (
     ResearchProject as ResearchProjectSchema,
     ResearchProjectCreate,
@@ -45,7 +47,7 @@ def list_research_projects(
     projects = query.order_by(ResearchProject.updated_at.desc()).offset(skip).limit(limit).all()
     
     return {
-        "items": projects,
+        "items": convert_uuid_to_str(projects),
         "total": total,
         "skip": skip,
         "limit": limit
@@ -73,7 +75,7 @@ def create_research_project(
     db.commit()
     db.refresh(db_project)
     
-    return db_project
+    return convert_uuid_to_str(db_project)
 
 
 @router.get("/{project_id}", response_model=ResearchProjectSchema)
@@ -93,7 +95,7 @@ def get_research_project(
     if not project:
         raise HTTPException(status_code=404, detail="Research project not found")
     
-    return project
+    return convert_uuid_to_str(project)
 
 
 @router.put("/{project_id}", response_model=ResearchProjectSchema)
@@ -133,7 +135,7 @@ def update_research_project(
     db.commit()
     db.refresh(project)
     
-    return project
+    return convert_uuid_to_str(project)
 
 
 @router.delete("/{project_id}", response_model=ResearchProjectDelete)

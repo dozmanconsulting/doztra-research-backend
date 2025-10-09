@@ -6,6 +6,9 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Body, Query, Path
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
+import uuid
+
+from app.utils.uuid_helper import convert_uuid_to_str
 
 from app.db.session import get_db
 from app.services.auth import get_current_user
@@ -157,7 +160,7 @@ async def get_project_content(
     ).order_by(GeneratedContent.section_title, GeneratedContent.version.desc()).offset(skip).limit(limit).all()
     
     return GeneratedContentList(
-        items=content_items,
+        items=convert_uuid_to_str(content_items),
         total=total,
         skip=skip,
         limit=limit
@@ -200,7 +203,7 @@ async def get_section_content(
     if not content:
         raise HTTPException(status_code=404, detail=f"No content found for section '{section_title}'")
     
-    return content
+    return convert_uuid_to_str(content)
 
 
 @router.put("/projects/{project_id}/content/{content_id}", response_model=GeneratedContentResponse)
@@ -251,7 +254,7 @@ async def update_content(
     db.commit()
     db.refresh(content)
     
-    return content
+    return convert_uuid_to_str(content)
 
 
 @router.put("/projects/{project_id}/content/section/{section_title}", response_model=GeneratedContentResponse)
@@ -313,7 +316,7 @@ async def update_section_content(
             db.commit()
             db.refresh(new_content)
             
-            return new_content
+            return convert_uuid_to_str(new_content)
     
     # If no changes to content or only metadata changes, update existing record
     if content_update.content_metadata is not None:
@@ -328,4 +331,4 @@ async def update_section_content(
     db.commit()
     db.refresh(content)
     
-    return content
+    return convert_uuid_to_str(content)
