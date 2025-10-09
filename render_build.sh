@@ -15,6 +15,16 @@ pip install gunicorn==21.2.0 uvicorn==0.37.0
 # Install spaCy model
 python -m spacy download en_core_web_sm
 
+# Check database connection before proceeding
+echo "Checking database connection..."
+if python check_render_db.py; then
+    echo "Database connection successful."
+else
+    echo "Warning: Database connection check failed. This might indicate a problem with the database URL."
+    echo "Continuing with deployment anyway..."
+    # Continue even if connection check fails
+fi
+
 # Run database migrations with proper error handling
 echo "Running database migrations..."
 if python -m alembic upgrade head; then
