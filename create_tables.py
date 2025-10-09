@@ -331,6 +331,83 @@ def ensure_usage_statistics_table(engine):
         logger.error(f"Error ensuring usage_statistics table: {e}")
         return False
 
+def ensure_subscription_columns(engine):
+    """Ensure the subscriptions table has all required columns."""
+    logger.info("Checking subscriptions table columns...")
+    
+    try:
+        with engine.connect() as conn:
+            # Check if required columns exist
+            columns_to_check = [
+                "status", "expires_at", "auto_renew", "stripe_customer_id", 
+                "stripe_subscription_id", "payment_method_id", "token_limit", "max_model_tier"
+            ]
+            
+            for column in columns_to_check:
+                result = conn.execute(text(f"""
+                    SELECT EXISTS (
+                        SELECT 1 
+                        FROM information_schema.columns 
+                        WHERE table_name = 'subscriptions' AND column_name = '{column}'
+                    )
+                """))
+                column_exists = result.scalar()
+                
+                if not column_exists:
+                    logger.info(f"Adding {column} column to subscriptions table...")
+                    
+                    if column == "status":
+                        conn.execute(text("""
+                            ALTER TABLE subscriptions 
+                            ADD COLUMN status VARCHAR(50) DEFAULT 'active' NOT NULL
+                        """))
+                    elif column == "expires_at":
+                        conn.execute(text("""
+                            ALTER TABLE subscriptions 
+                            ADD COLUMN expires_at TIMESTAMP WITHOUT TIME ZONE
+                        """))
+                    elif column == "auto_renew":
+                        conn.execute(text("""
+                            ALTER TABLE subscriptions 
+                            ADD COLUMN auto_renew BOOLEAN DEFAULT FALSE NOT NULL
+                        """))
+                    elif column == "stripe_customer_id":
+                        conn.execute(text("""
+                            ALTER TABLE subscriptions 
+                            ADD COLUMN stripe_customer_id VARCHAR(255)
+                        """))
+                    elif column == "stripe_subscription_id":
+                        conn.execute(text("""
+                            ALTER TABLE subscriptions 
+                            ADD COLUMN stripe_subscription_id VARCHAR(255)
+                        """))
+                    elif column == "payment_method_id":
+                        conn.execute(text("""
+                            ALTER TABLE subscriptions 
+                            ADD COLUMN payment_method_id VARCHAR(255)
+                        """))
+                    elif column == "token_limit":
+                        conn.execute(text("""
+                            ALTER TABLE subscriptions 
+                            ADD COLUMN token_limit INTEGER
+                        """))
+                    elif column == "max_model_tier":
+                        conn.execute(text("""
+                            ALTER TABLE subscriptions 
+                            ADD COLUMN max_model_tier VARCHAR(50) DEFAULT 'gpt-3.5-turbo' NOT NULL
+                        """))
+                    
+                    conn.commit()
+                    logger.info(f"Successfully added {column} column to subscriptions table")
+                else:
+                    logger.info(f"{column} column already exists in subscriptions table")
+            
+            logger.info("All required columns exist in subscriptions table")
+            return True
+    except SQLAlchemyError as e:
+        logger.error(f"Error ensuring subscription columns: {e}")
+        return False
+
 def check_tables(engine):
     """Check which tables exist in the database."""
     logger.info("Checking database tables...")
@@ -377,6 +454,9 @@ def main():
         
         # Ensure usage_statistics table exists
         ensure_usage_statistics_table(engine)
+        
+        # Ensure subscription columns exist
+        ensure_subscription_columns(engine)
         
         # Create admin user
         create_admin_user(session)
