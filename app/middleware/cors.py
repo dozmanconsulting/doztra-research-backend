@@ -50,10 +50,19 @@ class CustomCORSMiddleware(BaseHTTPMiddleware):
         # For non-OPTIONS requests, proceed with the request
         response = await call_next(request)
         
-        # Add CORS headers to the response
+        # Add CORS headers to the response, even for error responses
         if origin and is_allowed_origin:
             response.headers["Access-Control-Allow-Origin"] = origin
             response.headers["Access-Control-Allow-Credentials"] = "true"
             response.headers["Vary"] = "Origin"
+            
+            # Ensure these headers are present for error responses too
+            if response.status_code >= 400:
+                # Add additional headers that might be needed for error responses
+                response.headers["Access-Control-Expose-Headers"] = "Content-Length, X-Content-Type-Options"
+                
+                # Log error responses for debugging
+                logger.info(f"Error response: {response.status_code} for {request.method} {request.url.path}")
+                logger.info(f"Response headers: {response.headers}")
         
         return response
