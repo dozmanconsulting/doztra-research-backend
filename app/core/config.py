@@ -24,9 +24,7 @@ class Settings(BaseSettings):
     CORS_ORIGINS: List[str] = [
         "http://localhost:3000",  # Frontend dev server
         "http://localhost:8000",  # Backend dev server
-        "http://localhost:8080",  # Alternative frontend dev server
         "https://doztra.ai",      # Production frontend
-        "https://www.doztra.ai",  # Production frontend with www
         "https://doztra.netlify.app",  # Netlify deployment
         "https://www.doztra.netlify.app",  # Netlify with www subdomain
         "https://doztra-ai.netlify.app",  # New Netlify deployment

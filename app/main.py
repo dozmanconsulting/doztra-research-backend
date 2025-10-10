@@ -56,17 +56,10 @@ app.add_middleware(CustomCORSMiddleware)
 # Keep the original CORS middleware as a fallback
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS + [
-        "https://doztra-ai.netlify.app",
-        "https://www.doztra-ai.netlify.app",
-        "https://doztra.ai",
-        "https://www.doztra.ai"
-    ],
+    allow_origins=settings.CORS_ORIGINS + ["https://doztra-ai.netlify.app"],  # Explicitly add the domain
     allow_credentials=True,
     allow_methods=["*"],
-    allow_headers=["Authorization", "Content-Type", "Accept", "Origin", "X-Requested-With", "X-Auth-Token", "X-CSRF-Token", "Cache-Control"],
-    expose_headers=["Content-Length"],
-    max_age=600,
+    allow_headers=["*"],
 )
 
 # Mount static files directory
