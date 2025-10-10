@@ -60,11 +60,22 @@ async def query_with_documents_endpoint(
             options=request.options
         )
         
+        # Check for specific error conditions
+        if "error" in response and response["error"] == "document_not_found":
+            # Return a 404 status for missing documents
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=response["answer"]
+            )
+        
         # Track token usage (in a real implementation)
         # await track_token_usage(db, current_user.id, response.get("usage", {}))
         
         return response
         
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

@@ -751,12 +751,27 @@ async def query_with_documents(query: str, user_id: str, document_ids: List[str]
         # Merge with user options
         query_options = {**default_options, **(options or {})}
         
-        # Check if documents are processed
+        # Check if documents exist and are processed
         chunks_dir = Path("./document_chunks")
         for doc_id in document_ids or []:
+            # First check if the document exists in the user's uploads
+            user_dir = Path("./uploads") / user_id
+            doc_dir = user_dir / doc_id
+            
+            if not doc_dir.exists():
+                # Document doesn't exist
+                return {
+                    "answer": f"The document with ID {doc_id} was not found. Please check the document ID and try again.",
+                    "sources": [],
+                    "query": query,
+                    "model": query_options["model"],
+                    "error": "document_not_found"
+                }
+                
+            # Now check if document is processed
             chunks_file = chunks_dir / f"{doc_id}_chunks.json"
             if not chunks_file.exists():
-                # Document is not processed yet
+                # Document exists but is not processed yet
                 return {
                     "answer": f"The document with ID {doc_id} is still being processed. Please try again in a few moments.",
                     "sources": [],
