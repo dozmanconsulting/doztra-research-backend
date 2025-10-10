@@ -20,7 +20,7 @@ class TokenUsageCreate(TokenUsageBase):
 class TokenUsageInDBBase(TokenUsageBase):
     id: str
     user_id: str
-    timestamp: datetime
+    date: datetime
 
     class Config:
         from_attributes = True
@@ -62,7 +62,7 @@ class TokenUsageSummary(TokenUsageSummaryInDBBase):
 
 class TokenUsageRecord(BaseModel):
     id: str
-    timestamp: datetime
+    date: datetime
     request_type: str
     model: str
     prompt_tokens: int

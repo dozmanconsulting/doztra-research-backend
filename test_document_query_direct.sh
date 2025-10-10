@@ -53,8 +53,8 @@ echo -e "${GREEN}Available documents:${NC}"
 echo $DOCUMENTS_RESPONSE | jq
 
 # Extract a document ID if available
-DOCUMENT_IDS=$(echo $DOCUMENTS_RESPONSE | jq -r '.documents[].document_id')
-if [ -z "$DOCUMENT_IDS" ]; then
+DOCUMENT_ID=$(echo $DOCUMENTS_RESPONSE | jq -r '.documents[0].document_id')
+if [ -z "$DOCUMENT_ID" ]; then
   echo -e "${RED}No documents found. Creating a test document...${NC}"
   
   # Create a test document
@@ -92,8 +92,6 @@ EOL
   echo -e "\nWaiting for document processing (5 seconds)..."
   sleep 5
 else
-  # Use the first document ID
-  DOCUMENT_ID=$(echo $DOCUMENT_IDS | head -n 1)
   echo -e "${GREEN}Using existing document with ID: $DOCUMENT_ID${NC}"
 fi
 

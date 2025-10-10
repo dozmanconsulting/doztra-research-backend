@@ -11,6 +11,7 @@ def create_token_usage(db: Session, token_usage_in: TokenUsageCreate) -> TokenUs
     """
     Create a new token usage record.
     """
+    current_time = datetime.utcnow()
     db_token_usage = TokenUsage(
         user_id=token_usage_in.user_id,
         request_type=token_usage_in.request_type,
@@ -18,7 +19,8 @@ def create_token_usage(db: Session, token_usage_in: TokenUsageCreate) -> TokenUs
         prompt_tokens=token_usage_in.prompt_tokens,
         completion_tokens=token_usage_in.completion_tokens,
         total_tokens=token_usage_in.total_tokens,
-        request_id=token_usage_in.request_id
+        request_id=token_usage_in.request_id,
+        date=current_time  # Use the date column instead of timestamp
     )
     db.add(db_token_usage)
     db.commit()
@@ -37,7 +39,7 @@ def update_token_usage_summary(db: Session, token_usage: TokenUsage) -> None:
     """
     Update or create token usage summary for the day.
     """
-    today = token_usage.timestamp
+    today = token_usage.date  # Use date instead of timestamp
     year = today.year
     month = today.month
     day = today.day
@@ -119,17 +121,17 @@ def get_token_usage_history(
     query = db.query(TokenUsage).filter(TokenUsage.user_id == user_id)
     
     if start_date:
-        query = query.filter(TokenUsage.timestamp >= start_date)
+        query = query.filter(TokenUsage.date >= start_date)
     
     if end_date:
-        query = query.filter(TokenUsage.timestamp <= end_date)
+        query = query.filter(TokenUsage.date <= end_date)
     
     # Count total records for pagination
     total_records = query.count()
     total_pages = (total_records + limit - 1) // limit if total_records > 0 else 1
     
     # Apply pagination
-    records = query.order_by(TokenUsage.timestamp.desc()).offset((page - 1) * limit).limit(limit).all()
+    records = query.order_by(TokenUsage.date.desc()).offset((page - 1) * limit).limit(limit).all()
     
     return {
         "total_records": total_records,
@@ -178,8 +180,8 @@ def get_token_usage_statistics(db: Session, user_id: str) -> Dict[str, Any]:
     model_breakdown = {}
     model_usage = db.query(TokenUsage.model, func.sum(TokenUsage.total_tokens).label('total')).filter(
         TokenUsage.user_id == user_id,
-        TokenUsage.timestamp >= start_of_month,
-        TokenUsage.timestamp <= end_of_month
+        TokenUsage.date >= start_of_month,
+        TokenUsage.date <= end_of_month
     ).group_by(TokenUsage.model).all()
     
     for model, total in model_usage:

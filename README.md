@@ -118,6 +118,40 @@ A FastAPI-based authentication service for the Doztra AI Platform, providing sec
 └── run.py                # Application runner script
 ```
 
+## Recent Fixes (October 2025)
+
+We've addressed some critical issues in the backend service:
+
+### 1. Token Usage Database Schema Fix
+
+Fixed a database schema mismatch where the code was trying to use a `timestamp` column that didn't exist in the database. The fix includes:
+
+- Updated models to use `date` instead of `timestamp`
+- Added migration script to handle schema changes
+- Fixed all related services and schemas
+
+### 2. Research Projects API Authentication Fix
+
+Resolved issues with the Research Projects API returning 401 Unauthorized errors by:
+
+- Ensuring proper CORS headers are set
+- Fixing UUID serialization issues
+- Improving token refresh flow
+
+### How to Apply Fixes
+
+Run the following commands to apply the fixes:
+
+```bash
+# Apply database migrations
+python -m alembic upgrade head
+
+# Run the debug script to verify fixes
+./debug_auth.sh
+```
+
+For more details, see the [FIXES.md](./FIXES.md) file.
+
 ## Contributing
 
 1. Fork the repository

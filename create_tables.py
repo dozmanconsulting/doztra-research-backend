@@ -175,6 +175,34 @@ def create_tables(engine):
         Column('feedback_metadata', JSONB, nullable=True)
     )
     
+    # Chat tables
+    conversations = Table(
+        'conversations',
+        metadata,
+        Column('id', PostgresUUID(as_uuid=True), primary_key=True, default=uuid.uuid4),
+        Column('user_id', PostgresUUID(as_uuid=True), ForeignKey('users.id', ondelete='CASCADE'), nullable=False),
+        Column('title', String(255), nullable=True),
+        Column('created_at', DateTime, nullable=False, server_default=func.now()),
+        Column('updated_at', DateTime, nullable=False, server_default=func.now(), onupdate=func.now()),
+        Column('is_active', Boolean, nullable=False, default=True),
+        Column('conversation_metadata', JSONB, nullable=True)
+    )
+    
+    messages = Table(
+        'messages',
+        metadata,
+        Column('id', PostgresUUID(as_uuid=True), primary_key=True, default=uuid.uuid4),
+        Column('conversation_id', PostgresUUID(as_uuid=True), ForeignKey('conversations.id', ondelete='CASCADE'), nullable=False),
+        Column('role', String(50), nullable=False),
+        Column('content', Text, nullable=False),
+        Column('created_at', DateTime, nullable=False, server_default=func.now()),
+        Column('model', String(100), nullable=True),
+        Column('prompt_tokens', Integer, nullable=True),
+        Column('completion_tokens', Integer, nullable=True),
+        Column('total_tokens', Integer, nullable=True),
+        Column('message_metadata', JSONB, nullable=True)
+    )
+    
     research_content = Table(
         'research_content',
         metadata,

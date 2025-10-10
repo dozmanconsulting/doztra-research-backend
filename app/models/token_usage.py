@@ -23,7 +23,7 @@ class TokenUsage(Base):
     completion_tokens = Column(Integer, default=0, nullable=False)
     total_tokens = Column(Integer, default=0, nullable=False)
     request_id = Column(String, nullable=True)
-    timestamp = Column(DateTime, default=datetime.utcnow)
+    date = Column(DateTime, default=datetime.utcnow)
     
     # Relationships
     user = relationship("User", back_populates="token_usage")
