@@ -21,23 +21,63 @@
             border-radius: 5px;
             overflow-x: auto;
         }
+        .section {
+            margin-bottom: 20px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .success {
+            color: green;
+        }
+        .error {
+            color: red;
+        }
+        .options {
+            margin: 10px 0;
+        }
+        label {
+            margin-right: 10px;
+        }
     </style>
 </head>
 <body>
     <h1>CORS Test</h1>
     
-    <div>
+    <div class="section">
         <h2>Authentication</h2>
+        <div class="options">
+            <label>
+                <input type="radio" name="loginMethod" value="form" checked> Form Data
+            </label>
+            <label>
+                <input type="radio" name="loginMethod" value="json"> JSON
+            </label>
+        </div>
         <button id="loginBtn">Login</button>
         <pre id="tokenOutput">Token will appear here</pre>
     </div>
     
-    <div>
+    <div class="section">
         <h2>Test Document Endpoints</h2>
+        <div class="options">
+            <label>
+                <input type="checkbox" id="includeCredentials" checked> Include Credentials
+            </label>
+            <label>
+                <input type="checkbox" id="includeOrigin" checked> Include Origin Header
+            </label>
+        </div>
         <button id="listDocumentsBtn" disabled>List Documents</button>
         <button id="queryDocumentsBtn" disabled>Query Documents</button>
         <button id="uploadDocumentBtn" disabled>Upload Document</button>
         <pre id="output">Results will appear here</pre>
+    </div>
+    
+    <div class="section">
+        <h2>Preflight Test</h2>
+        <button id="testPreflightBtn">Test Preflight Request</button>
+        <pre id="preflightOutput">Results will appear here</pre>
     </div>
 
     <script>
@@ -45,23 +85,43 @@
         
         document.getElementById('loginBtn').addEventListener('click', async () => {
             try {
+                const loginMethod = document.querySelector('input[name="loginMethod"]:checked').value;
+                let headers = {};
+                let body;
+                
+                if (loginMethod === 'form') {
+                    headers['Content-Type'] = 'application/x-www-form-urlencoded';
+                    body = 'username=shedrackaji.aji@gmail.com&password=Password123!';
+                } else {
+                    headers['Content-Type'] = 'application/json';
+                    body = JSON.stringify({
+                        username: 'shedrackaji.aji@gmail.com',
+                        password: 'Password123!'
+                    });
+                }
+                
+                document.getElementById('tokenOutput').textContent = 'Logging in...';
+                console.log('Login request with method:', loginMethod);
+                
                 const response = await fetch('https://doztra-research.onrender.com/api/auth/login', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/x-www-form-urlencoded'
-                    },
-                    body: 'username=shedrack.aji@outlook.com&password=Password123!'
+                    headers: headers,
+                    body: body
                 });
+                
+                console.log('Login response status:', response.status);
+                console.log('Login response headers:', response.headers);
                 
                 const data = await response.json();
                 token = data.access_token;
                 
-                document.getElementById('tokenOutput').textContent = `Token: ${token.substring(0, 15)}...`;
+                document.getElementById('tokenOutput').innerHTML = `<span class="success">Login successful!</span><br>Token: ${token.substring(0, 15)}...`;
                 document.getElementById('listDocumentsBtn').disabled = false;
                 document.getElementById('queryDocumentsBtn').disabled = false;
                 document.getElementById('uploadDocumentBtn').disabled = false;
+                document.getElementById('testPreflightBtn').disabled = false;
             } catch (error) {
-                document.getElementById('tokenOutput').textContent = `Error: ${error.message}`;
+                document.getElementById('tokenOutput').innerHTML = `<span class="error">Error: ${error.message}</span>`;
                 console.error('Login error:', error);
             }
         });
@@ -71,22 +131,38 @@
                 document.getElementById('output').textContent = 'Fetching documents...';
                 console.log('Sending request to /api/documents with token:', token.substring(0, 15) + '...');
                 
-                const response = await fetch('https://doztra-research.onrender.com/api/documents', {
+                const includeCredentials = document.getElementById('includeCredentials').checked;
+                const includeOrigin = document.getElementById('includeOrigin').checked;
+                
+                const headers = {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                };
+                
+                if (includeOrigin) {
+                    headers['Origin'] = 'https://doztra.ai';
+                }
+                
+                const fetchOptions = {
                     method: 'GET',
-                    headers: {
-                        'Authorization': `Bearer ${token}`,
-                        'Content-Type': 'application/json'
-                    },
-                    credentials: 'include'
-                });
+                    headers: headers
+                };
+                
+                if (includeCredentials) {
+                    fetchOptions.credentials = 'include';
+                }
+                
+                console.log('Fetch options:', fetchOptions);
+                
+                const response = await fetch('https://doztra-research.onrender.com/api/documents', fetchOptions);
                 
                 console.log('Response status:', response.status);
                 console.log('Response headers:', response.headers);
                 
                 const data = await response.json();
-                document.getElementById('output').textContent = JSON.stringify(data, null, 2);
+                document.getElementById('output').innerHTML = `<span class="success">Request successful!</span><br>${JSON.stringify(data, null, 2)}`;
             } catch (error) {
-                document.getElementById('output').textContent = `Error: ${error.message}`;
+                document.getElementById('output').innerHTML = `<span class="error">Error: ${error.message}</span>`;
                 console.error('API error:', error);
             }
         });
@@ -96,38 +172,157 @@
                 document.getElementById('output').textContent = 'Querying documents...';
                 console.log('Sending request to /api/documents/query with token:', token.substring(0, 15) + '...');
                 
-                const response = await fetch('https://doztra-research.onrender.com/api/documents/query', {
+                const includeCredentials = document.getElementById('includeCredentials').checked;
+                const includeOrigin = document.getElementById('includeOrigin').checked;
+                
+                const headers = {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                };
+                
+                if (includeOrigin) {
+                    headers['Origin'] = 'https://doztra.ai';
+                }
+                
+                const fetchOptions = {
                     method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${token}`,
-                        'Content-Type': 'application/json'
-                    },
+                    headers: headers,
                     body: JSON.stringify({
                         message: 'Test query',
                         document_ids: []
-                    }),
-                    credentials: 'include'
-                });
+                    })
+                };
+                
+                if (includeCredentials) {
+                    fetchOptions.credentials = 'include';
+                }
+                
+                console.log('Fetch options:', fetchOptions);
+                
+                const response = await fetch('https://doztra-research.onrender.com/api/documents/query', fetchOptions);
                 
                 console.log('Response status:', response.status);
                 console.log('Response headers:', response.headers);
                 
                 const data = await response.json();
-                document.getElementById('output').textContent = JSON.stringify(data, null, 2);
+                document.getElementById('output').innerHTML = `<span class="success">Request successful!</span><br>${JSON.stringify(data, null, 2)}`;
             } catch (error) {
-                document.getElementById('output').textContent = `Error: ${error.message}`;
+                document.getElementById('output').innerHTML = `<span class="error">Error: ${error.message}</span>`;
                 console.error('API error:', error);
             }
         });
         
         document.getElementById('uploadDocumentBtn').addEventListener('click', async () => {
             try {
-                document.getElementById('output').textContent = 'This would upload a document, but we need a file input for that.';
-                console.log('Upload document functionality would go here');
-                // In a real implementation, you would need a file input and FormData
+                document.getElementById('output').textContent = 'Creating test document for upload...';
+                
+                const includeCredentials = document.getElementById('includeCredentials').checked;
+                const includeOrigin = document.getElementById('includeOrigin').checked;
+                
+                // Create a simple text file
+                const testContent = 'This is a test document for upload testing.';
+                const testFile = new File([testContent], 'test_upload.txt', { type: 'text/plain' });
+                
+                const formData = new FormData();
+                formData.append('file', testFile);
+                formData.append('title', 'Test Upload Document');
+                
+                const headers = {
+                    'Authorization': `Bearer ${token}`
+                };
+                
+                if (includeOrigin) {
+                    headers['Origin'] = 'https://doztra.ai';
+                }
+                
+                const fetchOptions = {
+                    method: 'POST',
+                    headers: headers,
+                    body: formData
+                };
+                
+                if (includeCredentials) {
+                    fetchOptions.credentials = 'include';
+                }
+                
+                console.log('Fetch options:', fetchOptions);
+                
+                const response = await fetch('https://doztra-research.onrender.com/api/documents/upload', fetchOptions);
+                
+                console.log('Response status:', response.status);
+                console.log('Response headers:', response.headers);
+                
+                const data = await response.json();
+                document.getElementById('output').innerHTML = `<span class="success">Upload successful!</span><br>${JSON.stringify(data, null, 2)}`;
             } catch (error) {
-                document.getElementById('output').textContent = `Error: ${error.message}`;
+                document.getElementById('output').innerHTML = `<span class="error">Error: ${error.message}</span>`;
                 console.error('API error:', error);
+            }
+        });
+        
+        document.getElementById('testPreflightBtn').addEventListener('click', async () => {
+            try {
+                document.getElementById('preflightOutput').textContent = 'Testing preflight request...';
+                
+                // We can't directly test preflight with fetch API, so we'll use XMLHttpRequest
+                const xhr = new XMLHttpRequest();
+                
+                // Log the preflight request
+                xhr.onreadystatechange = function() {
+                    if (xhr.readyState === 4) {
+                        console.log('Preflight response status:', xhr.status);
+                        console.log('Preflight response headers:', xhr.getAllResponseHeaders());
+                        
+                        let result = `Status: ${xhr.status}\n`;
+                        result += `Headers:\n${xhr.getAllResponseHeaders()}\n`;
+                        
+                        if (xhr.status === 200) {
+                            document.getElementById('preflightOutput').innerHTML = `<span class="success">Preflight successful!</span><br><pre>${result}</pre>`;
+                            
+                            // Now make the actual request
+                            makeActualRequest();
+                        } else {
+                            document.getElementById('preflightOutput').innerHTML = `<span class="error">Preflight failed!</span><br><pre>${result}</pre>`;
+                        }
+                    }
+                };
+                
+                // Open the request - this will trigger the preflight
+                xhr.open('GET', 'https://doztra-research.onrender.com/api/documents');
+                xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+                xhr.setRequestHeader('Content-Type', 'application/json');
+                xhr.withCredentials = true;
+                
+                // Send the request
+                xhr.send();
+                
+                function makeActualRequest() {
+                    const actualXhr = new XMLHttpRequest();
+                    actualXhr.onreadystatechange = function() {
+                        if (actualXhr.readyState === 4) {
+                            console.log('Actual response status:', actualXhr.status);
+                            console.log('Actual response headers:', actualXhr.getAllResponseHeaders());
+                            
+                            let result = `Status: ${actualXhr.status}\n`;
+                            result += `Headers:\n${actualXhr.getAllResponseHeaders()}\n`;
+                            
+                            if (actualXhr.status === 200) {
+                                document.getElementById('preflightOutput').innerHTML += `<br><span class="success">Actual request successful!</span><br><pre>${result}</pre>`;
+                            } else {
+                                document.getElementById('preflightOutput').innerHTML += `<br><span class="error">Actual request failed!</span><br><pre>${result}</pre>`;
+                            }
+                        }
+                    };
+                    
+                    actualXhr.open('GET', 'https://doztra-research.onrender.com/api/documents');
+                    actualXhr.setRequestHeader('Authorization', `Bearer ${token}`);
+                    actualXhr.setRequestHeader('Content-Type', 'application/json');
+                    actualXhr.withCredentials = true;
+                    actualXhr.send();
+                }
+            } catch (error) {
+                document.getElementById('preflightOutput').innerHTML = `<span class="error">Error: ${error.message}</span>`;
+                console.error('Preflight error:', error);
             }
         });
     </script>
