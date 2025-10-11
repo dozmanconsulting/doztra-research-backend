@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, B
 from fastapi.responses import JSONResponse
 from typing import List, Optional, Dict, Any
 from uuid import uuid4
+from datetime import datetime
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_active_user
@@ -68,7 +69,7 @@ async def upload_document(
         meta_dict.update({
             "original_filename": file.filename,
             "content_type": file.content_type,
-            "upload_date": str(status.datetime.now().isoformat()),
+            "upload_date": datetime.now().isoformat(),
             "user_id": str(current_user.id),
             "conversation_id": conversation_id,
             "title": title or file.filename
