@@ -1,3 +1,4 @@
-# Test Document for Processing
-
-This is a test document that will be used to simulate a document that's still processing.
+This is a test document for the improved document storage system.
+It contains multiple lines of text to test the document processing.
+The system should split this document into chunks and store them in the database.
+It should also generate embeddings for each chunk to enable semantic search.
