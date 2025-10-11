@@ -38,9 +38,10 @@ async def oauth_login(provider: str, redirect_uri: str = None):
 
 
 import logging
+from urllib.parse import urlencode
 logger = logging.getLogger(__name__)
 
-@router.get("/google/callback", response_model=UserWithToken)
+@router.get("/google/callback")
 async def google_oauth_callback(
     request: Request,
     db: Session = Depends(get_db),
@@ -66,38 +67,32 @@ async def google_oauth_callback(
         token_response, user = await handle_oauth_callback("google", code, db)
         logger.info(f"OAuth callback successful for user: {user.email}")
         
+        # Get the frontend URL - use state parameter if provided, otherwise default to home
+        frontend_url = state if state else '/'
         
-        # Create response with user data and tokens
-        user_data = {
-            "id": str(user.id),
-            "email": user.email,
-            "name": user.name,
-            "role": user.role.value if hasattr(user.role, "value") else user.role,
-            "is_active": user.is_active,
-            "is_verified": user.is_verified,
-            "created_at": user.created_at.isoformat() if user.created_at else None,
-            "updated_at": user.updated_at.isoformat() if user.updated_at else None,
-            "last_login": user.last_login.isoformat() if user.last_login else None,
-            "oauth_provider": user.oauth_provider
+        # If frontend_url doesn't start with http, assume it's a relative path
+        if not frontend_url.startswith('http'):
+            frontend_url = 'https://doztra.ai' + ('' if frontend_url.startswith('/') else '/') + frontend_url
+        
+        # Add tokens as query parameters
+        params = {
+            'access_token': token_response['access_token'],
+            'token_type': token_response['token_type'],
+            'user_email': user.email,
+            'user_name': user.name,
+            'success': 'true'
         }
         
-        # Add subscription data if available
-        if hasattr(user, "subscription") and user.subscription:
-            user_data["subscription"] = {
-                "id": str(user.subscription.id),
-                "user_id": str(user.subscription.user_id),
-                "plan": user.subscription.plan.value if hasattr(user.subscription.plan, "value") else user.subscription.plan,
-                "status": user.subscription.status.value if hasattr(user.subscription.status, "value") else user.subscription.status,
-                "is_active": user.subscription.is_active,
-                "created_at": user.subscription.created_at.isoformat() if user.subscription.created_at else None,
-                "updated_at": user.subscription.updated_at.isoformat() if user.subscription.updated_at else None,
-                "expires_at": user.subscription.expires_at.isoformat() if user.subscription.expires_at else None
-            }
+        # Add refresh token if available
+        if 'refresh_token' in token_response:
+            params['refresh_token'] = token_response['refresh_token']
         
-        return {
-            **user_data,
-            **token_response
-        }
+        # Create the redirect URL with query parameters
+        redirect_url = f"{frontend_url}?{urlencode(params)}"
+        logger.info(f"Redirecting to frontend: {frontend_url}")
+        
+        # Redirect to the frontend
+        return RedirectResponse(url=redirect_url)
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
