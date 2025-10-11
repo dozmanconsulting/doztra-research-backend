@@ -13,9 +13,10 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from datetime import datetime
 import json
 import logging
+import os
 from typing import Optional
 
-from app.api.routes import auth, users, token_usage, user_preferences, usage_statistics, admin, subscription_plans, chat, research_projects, research_content, documents, document_queries, research, research_options, content_feedback
+from app.api.routes import auth, users, token_usage, user_preferences, usage_statistics, admin, subscription_plans, chat, research_projects, research_content, documents, document_queries, research, research_options, content_feedback, documents_improved
 from app.core.config import settings
 from app.services.auth import get_current_user, verify_token
 from app.services.admin import verify_admin_token, security
@@ -24,6 +25,19 @@ from app.db.session import get_db
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# Initialize GCS credentials if configured
+from app.core.gcs_init import initialize_gcs_credentials
+credentials_path = initialize_gcs_credentials()
+if credentials_path:
+    logger.info(f"GCS credentials initialized from {credentials_path}")
+    # Set GCS storage flag to True if credentials are available
+    if not hasattr(settings, 'USE_GCS_STORAGE') or not settings.USE_GCS_STORAGE:
+        logger.info("Enabling GCS storage based on available credentials")
+        os.environ['USE_GCS_STORAGE'] = 'true'
+else:
+    logger.warning("No GCS credentials found, falling back to local storage")
+    os.environ['USE_GCS_STORAGE'] = 'false'
 
 # Security scheme is imported from admin service
 
@@ -81,8 +95,12 @@ app.include_router(research_projects.router, prefix="/api/research/projects", ta
 app.include_router(research_content.router, prefix="/api/research/content", tags=["Research Content"])
 app.include_router(research_options.router, prefix="/api/research/options", tags=["Research Options"])
 app.include_router(research.router, prefix="/api/research", tags=["Research Tools"])
+# Original document routes (kept for backward compatibility)
 app.include_router(documents.router, prefix="/api/documents", tags=["Documents"])
 app.include_router(document_queries.router, prefix="/api/documents", tags=["Document Queries"])
+
+# Improved document routes
+app.include_router(documents_improved.router, prefix="/api/v2/documents", tags=["Documents V2"])
 app.include_router(content_feedback.router, prefix="/api", tags=["Content Feedback"])
 
 # Custom exception handler for validation errors

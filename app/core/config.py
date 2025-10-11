@@ -1,6 +1,8 @@
 from pydantic_settings import BaseSettings
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 import secrets
+import os
+from pathlib import Path
 from datetime import timedelta
 
 
@@ -68,6 +70,30 @@ class Settings(BaseSettings):
     LLM_CODE: str = "gpt-3.5-turbo"
     LLM_REGULAR: str = "gpt-3.5-turbo"
     LLM_DEFAULT_EXECUTION: str = "gpt-3.5-turbo"
+    
+    # Document Processing Settings
+    UPLOAD_DIR: str = "./uploads"
+    DOCUMENT_CHUNKS_DIR: str = "./document_chunks"
+    MAX_CONCURRENT_PROCESSING: int = 3
+    DEFAULT_CHUNK_SIZE: int = 1000
+    EMBEDDING_MODEL: str = "text-embedding-ada-002"
+    
+    # Storage Settings
+    USE_S3_STORAGE: bool = False
+    AWS_ACCESS_KEY_ID: Optional[str] = None
+    AWS_SECRET_ACCESS_KEY: Optional[str] = None
+    AWS_REGION: str = "us-east-1"
+    AWS_BUCKET_NAME: Optional[str] = None
+    
+    # Google Cloud Storage Settings
+    USE_GCS_STORAGE: bool = False
+    GCS_BUCKET_NAME: Optional[str] = None
+    GOOGLE_APPLICATION_CREDENTIALS: Optional[str] = None
+    
+    # Document Processing Optimization
+    PARALLEL_EMBEDDING_GENERATION: bool = True
+    MAX_PARALLEL_EMBEDDINGS: int = 5
+    OPTIMIZE_CHUNK_SIZE: bool = True
     
     class Config:
         case_sensitive = True

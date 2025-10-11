@@ -53,6 +53,7 @@ class User(Base):
     usage_statistics = relationship("UsageStatistics", back_populates="user", uselist=False, cascade="all, delete")
     conversations = relationship("Conversation", back_populates="user", cascade="all, delete")
     research_projects = relationship("ResearchProject", back_populates="user", cascade="all, delete")
+    documents = relationship("Document", back_populates="user", cascade="all, delete")
 
 
 class Subscription(Base):

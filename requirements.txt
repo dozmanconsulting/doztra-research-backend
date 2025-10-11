@@ -21,6 +21,11 @@ httpx==0.28.1
 requests==2.32.5
 openai==2.2.0
 
+# Cloud storage dependencies
+google-cloud-storage==2.15.0
+aiofiles==23.2.1
+boto3==1.35.0
+
 # NLP and text analysis dependencies
 spacy==3.8.7
 nltk==3.9.2
