@@ -37,7 +37,10 @@ async def oauth_login(provider: str, redirect_uri: str = None):
         )
 
 
-@router.get("/oauth/google/callback", response_model=UserWithToken)
+import logging
+logger = logging.getLogger(__name__)
+
+@router.get("/google/callback", response_model=UserWithToken)
 async def google_oauth_callback(
     request: Request,
     db: Session = Depends(get_db),
@@ -57,7 +60,12 @@ async def google_oauth_callback(
         UserWithToken: User data with access and refresh tokens
     """
     try:
+        logger.info(f"Google OAuth callback received with code: {code[:10]}...")
+        logger.info(f"Request URL: {request.url}")
+        logger.info(f"Request headers: {request.headers}")
         token_response, user = await handle_oauth_callback("google", code, db)
+        logger.info(f"OAuth callback successful for user: {user.email}")
+        
         
         # Create response with user data and tokens
         user_data = {

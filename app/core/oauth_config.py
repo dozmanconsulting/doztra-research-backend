@@ -18,7 +18,7 @@ google_oauth_config = OAuthConfig(
     authorize_url="https://accounts.google.com/o/oauth2/auth",
     token_url="https://oauth2.googleapis.com/token",
     userinfo_url="https://www.googleapis.com/oauth2/v3/userinfo",
-    redirect_uri=f"{settings.BASE_URL}/api/auth/oauth/google/callback",
+    redirect_uri="https://doztra-research.onrender.com/api/auth/oauth/google/callback",
     scope=["email", "profile"]
 )
 
