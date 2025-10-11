@@ -450,13 +450,14 @@ async def extract_text_from_image(image_path: str) -> str:
         raise Exception(f"Failed to process image: {str(e)}")
 
 
-async def chunk_document(text: str, metadata: Dict[str, Any] = None) -> List[Dict[str, Any]]:
+async def chunk_document(text: str, metadata: Dict[str, Any] = None, chunk_size: int = None) -> List[Dict[str, Any]]:
     """
     Split a document into manageable chunks for processing.
     
     Args:
         text: The document text to chunk
         metadata: Additional metadata to include with each chunk
+        chunk_size: Optional custom chunk size (defaults to MAX_CHUNK_SIZE)
         
     Returns:
         List[Dict[str, Any]]: List of chunks with text and metadata
@@ -467,9 +468,12 @@ async def chunk_document(text: str, metadata: Dict[str, Any] = None) -> List[Dic
         chunks = []
         current_chunk = ""
         
+        # Use custom chunk size if provided, otherwise use default
+        max_size = chunk_size if chunk_size is not None else MAX_CHUNK_SIZE
+        
         for i, paragraph in enumerate(paragraphs):
             # If adding this paragraph would exceed max chunk size, save current chunk and start a new one
-            if len(current_chunk) + len(paragraph) > MAX_CHUNK_SIZE:
+            if len(current_chunk) + len(paragraph) > max_size:
                 if current_chunk:  # Don't add empty chunks
                     chunks.append({
                         "text": current_chunk,
@@ -542,7 +546,7 @@ async def generate_embeddings(texts: List[str]) -> List[List[float]]:
         raise Exception(f"Failed to generate embeddings: {str(e)}")
 
 
-async def process_document(file_path: str, file_type: str, document_id: str, user_id: str, metadata: Dict[str, Any] = None) -> Dict[str, Any]:
+async def process_document(file_path: str, file_type: str, document_id: str, user_id: str, metadata: Dict[str, Any] = None, chunk_size: int = None) -> Dict[str, Any]:
     """
     Process a document: extract text, chunk it, generate embeddings, and store in vector database.
     
@@ -552,6 +556,7 @@ async def process_document(file_path: str, file_type: str, document_id: str, use
         document_id: Unique ID for the document
         user_id: ID of the user who uploaded the document
         metadata: Additional metadata about the document
+        chunk_size: Optional custom chunk size for document processing
         
     Returns:
         Dict[str, Any]: Processing results including chunk count and status
@@ -570,7 +575,7 @@ async def process_document(file_path: str, file_type: str, document_id: str, use
         }
         
         # Chunk the document
-        chunks = await chunk_document(text, doc_metadata)
+        chunks = await chunk_document(text, doc_metadata, chunk_size)
         
         # Extract just the text for embedding
         chunk_texts = [chunk["text"] for chunk in chunks]
