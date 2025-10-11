@@ -36,13 +36,20 @@ class User(Base):
     id = Column(String, primary_key=True, index=True, default=lambda: str(uuid.uuid4()))
     email = Column(String, unique=True, index=True, nullable=False)
     name = Column(String, nullable=False)
-    hashed_password = Column(String, nullable=False)
+    hashed_password = Column(String, nullable=True)  # Nullable for OAuth users
     role = Column(String, default=UserRole.USER, nullable=False)
     is_active = Column(Boolean, default=True)
     is_verified = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     last_login = Column(DateTime, nullable=True)
+    
+    # OAuth fields
+    oauth_provider = Column(String, nullable=True)  # e.g., 'google', 'facebook'
+    oauth_user_id = Column(String, nullable=True)  # Provider's user ID
+    oauth_access_token = Column(String, nullable=True)
+    oauth_refresh_token = Column(String, nullable=True)
+    oauth_token_expires_at = Column(DateTime, nullable=True)
     
     # Relationships
     subscription = relationship("Subscription", back_populates="user", uselist=False)

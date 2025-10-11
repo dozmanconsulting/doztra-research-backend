@@ -16,7 +16,7 @@ import logging
 import os
 from typing import Optional
 
-from app.api.routes import auth, users, token_usage, user_preferences, usage_statistics, admin, subscription_plans, chat, research_projects, research_content, documents, document_queries, research, research_options, content_feedback, documents_improved
+from app.api.routes import auth, users, token_usage, user_preferences, usage_statistics, admin, subscription_plans, chat, research_projects, research_content, documents, document_queries, research, research_options, content_feedback, documents_improved, oauth
 from app.core.config import settings
 from app.services.auth import get_current_user, verify_token
 from app.services.admin import verify_admin_token, security
@@ -107,6 +107,7 @@ templates = Jinja2Templates(directory="app/templates")
 
 # Include routers
 app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
+app.include_router(oauth.router, prefix="/api/auth/oauth", tags=["OAuth Authentication"])
 app.include_router(users.router, prefix="/api/users", tags=["User Management"])
 app.include_router(token_usage.router, prefix="/api/tokens", tags=["Token Usage"])
 app.include_router(user_preferences.router, prefix="/api/preferences", tags=["User Preferences"])

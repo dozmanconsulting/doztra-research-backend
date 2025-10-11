@@ -20,6 +20,14 @@ def get_user_by_email(db: Session, email: str) -> Optional[User]:
     return db.query(User).filter(User.email == email).first()
 
 
+def get_user_by_oauth(db: Session, provider: str, oauth_user_id: str) -> Optional[User]:
+    """Get a user by OAuth provider and ID."""
+    return db.query(User).filter(
+        User.oauth_provider == provider,
+        User.oauth_user_id == oauth_user_id
+    ).first()
+
+
 def get_user_by_id(db: Session, user_id: str) -> Optional[User]:
     """Get a user by ID."""
     return db.query(User).filter(User.id == user_id).first()
@@ -89,13 +97,33 @@ def create_user(db: Session, user_in: UserCreate) -> User:
     
     # Create new user
     user_id = str(uuid.uuid4())
-    db_user = User(
-        id=user_id,
-        email=user_in.email,
-        name=user_in.name,
-        hashed_password=get_password_hash(user_in.password),
-        role=user_in.role
-    )
+    
+    # Handle OAuth users (no password)
+    if user_in.password is None:
+        if not user_in.oauth_provider or not user_in.oauth_user_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="OAuth users must provide oauth_provider and oauth_user_id",
+            )
+        db_user = User(
+            id=user_id,
+            email=user_in.email,
+            name=user_in.name,
+            hashed_password=None,  # No password for OAuth users
+            role=user_in.role,
+            oauth_provider=user_in.oauth_provider,
+            oauth_user_id=user_in.oauth_user_id,
+            is_verified=True  # OAuth users are automatically verified
+        )
+    else:
+        # Regular password-based user
+        db_user = User(
+            id=user_id,
+            email=user_in.email,
+            name=user_in.name,
+            hashed_password=get_password_hash(user_in.password),
+            role=user_in.role
+        )
     db.add(db_user)
     
     # Process subscription information

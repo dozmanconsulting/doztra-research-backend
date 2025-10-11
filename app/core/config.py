@@ -57,6 +57,11 @@ class Settings(BaseSettings):
     # Google API
     GOOGLE_API_KEY: Optional[str] = None
     
+    # Google OAuth
+    GOOGLE_OAUTH_CLIENT_ID: Optional[str] = None
+    GOOGLE_OAUTH_CLIENT_SECRET: Optional[str] = None
+    BASE_URL: str = "https://doztra-research.onrender.com"
+    
     # Additional LLM Settings
     ANTHROPIC_API_KEY: Optional[str] = None
     GEMINI_API_KEY: Optional[str] = None

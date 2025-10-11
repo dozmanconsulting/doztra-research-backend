@@ -62,11 +62,17 @@ class UserBase(BaseModel):
 
 
 class UserCreate(UserBase):
-    password: str = Field(..., min_length=8)
+    password: Optional[str] = Field(None, min_length=8)
     subscription: Optional[Dict[str, Any]] = None
+    oauth_provider: Optional[str] = None
+    oauth_user_id: Optional[str] = None
     
     @validator('password')
     def password_strength(cls, v):
+        # Skip validation if password is None (OAuth user)
+        if v is None:
+            return v
+            
         if len(v) < 8:
             raise ValueError('Password must be at least 8 characters long')
         if not any(char.isdigit() for char in v):
@@ -107,6 +113,8 @@ class User(UserInDBBase):
     subscription: Optional[Subscription] = None
     preferences: Optional[UserPreferences] = None
     usage: Optional[UsageStatistics] = None
+    oauth_provider: Optional[str] = None
+    oauth_user_id: Optional[str] = None
     
     model_config = {
         "from_attributes": True
