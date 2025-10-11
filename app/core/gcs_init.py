@@ -28,8 +28,24 @@ def initialize_gcs_credentials():
             
             # Set the environment variable to point to the temporary file
             os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = path
-            logger.info(f"Created temporary service account key file at {path}")
             
+            # Make sure USE_GCS_STORAGE is set to true
+            os.environ["USE_GCS_STORAGE"] = "true"
+            
+            # Try to extract bucket name from credentials if not set
+            if "GCS_BUCKET_NAME" not in os.environ:
+                try:
+                    import json
+                    creds_data = json.loads(os.environ["GOOGLE_APPLICATION_CREDENTIALS_JSON"])
+                    project_id = creds_data.get("project_id")
+                    if project_id:
+                        # Use project ID as default bucket name
+                        os.environ["GCS_BUCKET_NAME"] = f"{project_id}-documents"
+                        logger.info(f"Set default GCS_BUCKET_NAME to {os.environ['GCS_BUCKET_NAME']}")
+                except Exception as e:
+                    logger.warning(f"Failed to extract project ID from credentials: {str(e)}")
+            
+            logger.info(f"Created temporary service account key file at {path}")
             return path
         except Exception as e:
             logger.error(f"Failed to create temporary credentials file: {str(e)}")

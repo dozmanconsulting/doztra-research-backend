@@ -49,24 +49,32 @@ class StorageService:
             )
             self.bucket_name = settings.AWS_BUCKET_NAME
         
-        # Set up GCS client if available and configured
+        # Set up GCS client variables (will initialize lazily)
         self.gcs_client = None
         self.bucket = None
+        self.gcs_bucket_name = None
         
         # Check environment variables first, then settings
         self.use_gcs = os.environ.get('USE_GCS_STORAGE', '').lower() == 'true'
         if not self.use_gcs and hasattr(settings, 'USE_GCS_STORAGE'):
             self.use_gcs = settings.USE_GCS_STORAGE
         
-        if self.use_gcs and GCS_AVAILABLE:
+        # Get bucket name from environment or settings
+        if self.use_gcs:
+            self.gcs_bucket_name = os.environ.get('GCS_BUCKET_NAME')
+            if not self.gcs_bucket_name and hasattr(settings, 'GCS_BUCKET_NAME'):
+                self.gcs_bucket_name = settings.GCS_BUCKET_NAME
+            
+            if not self.gcs_bucket_name:
+                logger.warning("GCS_BUCKET_NAME not configured, disabling GCS storage")
+                self.use_gcs = False
+    
+    def _init_gcs_client(self):
+        """Initialize GCS client lazily when needed"""
+        if self.use_gcs and GCS_AVAILABLE and not self.gcs_client:
             try:
                 # Initialize GCS client
                 self.gcs_client = storage.Client()
-                
-                # Get bucket name from environment or settings
-                self.gcs_bucket_name = os.environ.get('GCS_BUCKET_NAME')
-                if not self.gcs_bucket_name and hasattr(settings, 'GCS_BUCKET_NAME'):
-                    self.gcs_bucket_name = settings.GCS_BUCKET_NAME
                 
                 if not self.gcs_bucket_name:
                     raise ValueError("GCS_BUCKET_NAME not configured")
@@ -75,9 +83,12 @@ class StorageService:
                 self.bucket = self.gcs_client.bucket(self.gcs_bucket_name)
                 
                 logger.info(f"GCS storage initialized with bucket: {self.gcs_bucket_name}")
+                return True
             except Exception as e:
                 logger.error(f"Failed to initialize GCS client: {str(e)}")
                 self.use_gcs = False
+                return False
+        return self.use_gcs and self.gcs_client and self.bucket
     
     async def upload_file(self, file: UploadFile, user_id: str, document_id: str) -> Dict[str, Any]:
         """
@@ -95,7 +106,7 @@ class StorageService:
         file_name = file.filename
         
         # Check if GCS is configured (preferred over S3)
-        if self.use_gcs and self.gcs_client and self.bucket:
+        if self.use_gcs and self._init_gcs_client():
             # Upload to GCS
             try:
                 # Create blob path
@@ -186,7 +197,7 @@ class StorageService:
             Path to the downloaded file
         """
         # Check if file is in GCS
-        if file_path.startswith("gs://") and self.gcs_client and self.bucket:
+        if file_path.startswith("gs://") and self._init_gcs_client():
             try:
                 # Extract bucket and blob path from GCS URI
                 parts = file_path.replace("gs://", "").split("/")
@@ -254,7 +265,7 @@ class StorageService:
             True if deletion was successful
         """
         # Check if file is in GCS
-        if file_path.startswith("gs://") and self.gcs_client:
+        if file_path.startswith("gs://") and self._init_gcs_client():
             try:
                 # Extract bucket and blob path from GCS URI
                 parts = file_path.replace("gs://", "").split("/")

@@ -27,6 +27,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Initialize GCS credentials if configured
+# This MUST happen before importing any services that use GCS
 from app.core.gcs_init import initialize_gcs_credentials
 credentials_path = initialize_gcs_credentials()
 if credentials_path:
@@ -35,6 +36,28 @@ if credentials_path:
     if not hasattr(settings, 'USE_GCS_STORAGE') or not settings.USE_GCS_STORAGE:
         logger.info("Enabling GCS storage based on available credentials")
         os.environ['USE_GCS_STORAGE'] = 'true'
+    
+    # Make sure GCS_BUCKET_NAME is set
+    if 'GCS_BUCKET_NAME' not in os.environ and hasattr(settings, 'GCS_BUCKET_NAME') and settings.GCS_BUCKET_NAME:
+        os.environ['GCS_BUCKET_NAME'] = settings.GCS_BUCKET_NAME
+        logger.info(f"Using GCS bucket from settings: {settings.GCS_BUCKET_NAME}")
+    elif 'GCS_BUCKET_NAME' in os.environ:
+        logger.info(f"Using GCS bucket from environment: {os.environ['GCS_BUCKET_NAME']}")
+    else:
+        logger.warning("GCS_BUCKET_NAME not set, using default bucket name")
+        # Try to extract project ID from credentials
+        try:
+            import json
+            with open(credentials_path, 'r') as f:
+                creds_data = json.load(f)
+            project_id = creds_data.get('project_id')
+            if project_id:
+                os.environ['GCS_BUCKET_NAME'] = f"{project_id}-documents"
+                logger.info(f"Set default GCS_BUCKET_NAME to {os.environ['GCS_BUCKET_NAME']}")
+        except Exception as e:
+            logger.warning(f"Failed to extract project ID from credentials: {str(e)}")
+            os.environ['GCS_BUCKET_NAME'] = "doztra-documents"
+            logger.info("Using fallback bucket name: doztra-documents")
 else:
     logger.warning("No GCS credentials found, falling back to local storage")
     os.environ['USE_GCS_STORAGE'] = 'false'
