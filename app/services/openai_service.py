@@ -562,10 +562,15 @@ async def process_document(file_path: str, file_type: str, document_id: str, use
         Dict[str, Any]: Processing results including chunk count and status
     """
     try:
+        logger.info(f"Processing document: {file_path}, type: {file_type}, id: {document_id}")
+        
         # Extract text from document
+        logger.info(f"Extracting text from document: {file_path}")
         text = await extract_text_from_document(file_path, file_type)
+        logger.info(f"Extracted {len(text)} characters of text")
         
         # Prepare document metadata
+        logger.info(f"Preparing metadata with: {metadata}")
         doc_metadata = {
             "document_id": document_id,
             "user_id": user_id,
@@ -573,19 +578,38 @@ async def process_document(file_path: str, file_type: str, document_id: str, use
             "processed_at": datetime.now().isoformat(),
             **(metadata or {})
         }
+        logger.info(f"Final metadata: {doc_metadata}")
         
         # Chunk the document
+        logger.info(f"Chunking document with size: {chunk_size if chunk_size else 'default'}")
         chunks = await chunk_document(text, doc_metadata, chunk_size)
+        logger.info(f"Created {len(chunks)} chunks")
         
         # Extract just the text for embedding
-        chunk_texts = [chunk["text"] for chunk in chunks]
+        logger.info("Extracting text for embeddings")
+        chunk_texts = []
+        for i, chunk in enumerate(chunks):
+            try:
+                chunk_texts.append(chunk["text"])
+            except Exception as e:
+                logger.error(f"Error extracting text from chunk {i}: {str(e)}")
+                logger.error(f"Chunk data: {chunk}")
+                raise
         
         # Generate embeddings
+        logger.info(f"Generating embeddings for {len(chunk_texts)} chunks")
         embeddings = await generate_embeddings(chunk_texts)
+        logger.info(f"Generated {len(embeddings)} embeddings")
         
         # Add embeddings to chunks
+        logger.info("Adding embeddings to chunks")
         for i, embedding in enumerate(embeddings):
-            chunks[i]["embedding"] = embedding
+            try:
+                chunks[i]["embedding"] = embedding
+            except Exception as e:
+                logger.error(f"Error adding embedding to chunk {i}: {str(e)}")
+                logger.error(f"Chunk data: {chunks[i] if i < len(chunks) else 'index out of range'}")
+                raise
         
         # Store in vector database (implementation depends on your vector DB choice)
         # This is a placeholder - replace with actual vector DB storage code
@@ -620,24 +644,48 @@ async def store_document_chunks(chunks: List[Dict[str, Any]], document_id: str, 
     # For example, using Pinecone, Weaviate, Milvus, or PostgreSQL with pgvector
     
     try:
+        logger.info(f"Storing {len(chunks)} document chunks for document {document_id}")
+        
         # Example using a hypothetical vector DB client
         # For actual implementation, replace with your chosen vector DB
         
         # Prepare records for batch insertion
         records = []
         for i, chunk in enumerate(chunks):
-            # Ensure metadata is a dictionary
-            if isinstance(chunk.get('metadata'), dict):
-                chunk_index = chunk['metadata'].get('chunk_index', i)
-            else:
-                chunk_index = i
+            try:
+                logger.info(f"Processing chunk {i} for storage")
                 
-            records.append({
-                "id": f"{document_id}_chunk_{chunk_index}",
-                "values": chunk["embedding"],
-                "metadata": chunk.get("metadata", {}),
-                "text": chunk["text"]
-            })
+                # Ensure metadata is a dictionary
+                if isinstance(chunk.get('metadata'), dict):
+                    chunk_index = chunk['metadata'].get('chunk_index', i)
+                    logger.info(f"Using metadata chunk_index: {chunk_index}")
+                else:
+                    chunk_index = i
+                    logger.info(f"Using default chunk_index: {i}, metadata type: {type(chunk.get('metadata'))}")
+                    if chunk.get('metadata') is not None:
+                        logger.info(f"Metadata value: {chunk.get('metadata')}")
+                
+                # Ensure text is present
+                if 'text' not in chunk:
+                    logger.error(f"Missing 'text' in chunk {i}: {chunk}")
+                    raise KeyError(f"Missing 'text' in chunk {i}")
+                    
+                # Ensure embedding is present
+                if 'embedding' not in chunk:
+                    logger.error(f"Missing 'embedding' in chunk {i}: {chunk}")
+                    raise KeyError(f"Missing 'embedding' in chunk {i}")
+                
+                records.append({
+                    "id": f"{document_id}_chunk_{chunk_index}",
+                    "values": chunk["embedding"],
+                    "metadata": chunk.get("metadata", {}),
+                    "text": chunk["text"]
+                })
+                
+            except Exception as e:
+                logger.error(f"Error processing chunk {i} for storage: {str(e)}")
+                logger.error(f"Chunk data: {chunk}")
+                raise
         
         # Store in vector DB (placeholder)
         # vector_db_client.upsert(index_name="documents", namespace=user_id, vectors=records)
@@ -650,23 +698,53 @@ async def store_document_chunks(chunks: List[Dict[str, Any]], document_id: str, 
         output_dir.mkdir(exist_ok=True)
         
         # Remove embeddings to make the JSON file smaller
+        logger.info("Creating simplified chunks for JSON storage")
         simplified_chunks = []
         for i, chunk in enumerate(chunks):
-            # Ensure metadata is a dictionary
-            if isinstance(chunk.get('metadata'), dict):
-                chunk_index = chunk['metadata'].get('chunk_index', i)
-                metadata = chunk['metadata']
-            else:
-                chunk_index = i
-                metadata = {"chunk_index": i}
+            try:
+                logger.info(f"Processing chunk {i} for JSON storage")
                 
-            simplified_chunk = {
-                "id": f"{document_id}_chunk_{chunk_index}",
-                "metadata": metadata,
-                "text": chunk["text"],
-                "embedding_size": len(chunk["embedding"]) if "embedding" in chunk else 0
-            }
-            simplified_chunks.append(simplified_chunk)
+                # Ensure metadata is a dictionary
+                if isinstance(chunk.get('metadata'), dict):
+                    chunk_index = chunk['metadata'].get('chunk_index', i)
+                    metadata = chunk['metadata']
+                    logger.info(f"Using metadata from chunk: {chunk_index}")
+                else:
+                    chunk_index = i
+                    metadata = {"chunk_index": i}
+                    logger.info(f"Created default metadata for chunk {i}")
+                
+                # Ensure text is present
+                if 'text' not in chunk:
+                    logger.error(f"Missing 'text' in chunk {i} for JSON storage: {chunk}")
+                    # Use a placeholder instead of failing
+                    text = f"[Missing text for chunk {i}]"
+                else:
+                    text = chunk["text"]
+                    
+                # Get embedding size if available
+                if "embedding" in chunk:
+                    try:
+                        embedding_size = len(chunk["embedding"])
+                    except Exception as e:
+                        logger.error(f"Error getting embedding size: {str(e)}")
+                        embedding_size = 0
+                else:
+                    embedding_size = 0
+                
+                simplified_chunk = {
+                    "id": f"{document_id}_chunk_{chunk_index}",
+                    "metadata": metadata,
+                    "text": text,
+                    "embedding_size": embedding_size
+                }
+                simplified_chunks.append(simplified_chunk)
+                
+            except Exception as e:
+                logger.error(f"Error processing chunk {i} for JSON storage: {str(e)}")
+                logger.error(f"Chunk data: {chunk}")
+                # Continue with other chunks instead of failing completely
+                continue
         
         with open(output_dir / f"{document_id}_chunks.json", "w") as f:
             json.dump(simplified_chunks, f, indent=2)
