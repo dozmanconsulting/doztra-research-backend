@@ -123,9 +123,38 @@ class DocumentService:
                     # Instead of using the complex openai_process_document function,
                     # we'll just create a simple chunk from the document text
                     
-                    # Read the file content
-                    with open(local_file_path, 'r', encoding='utf-8') as f:
-                        text = f.read()
+                    # Read the file content based on file type
+                    if file_type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
+                        # Handle DOCX files
+                        try:
+                            import docx
+                            doc = docx.Document(local_file_path)
+                            text = "\n\n".join([paragraph.text for paragraph in doc.paragraphs])
+                        except ImportError:
+                            # If python-docx is not installed, use a placeholder
+                            text = "[DOCX file content - python-docx not installed]"
+                    elif file_type == "application/pdf":
+                        # Handle PDF files
+                        try:
+                            import PyPDF2
+                            with open(local_file_path, "rb") as file:
+                                reader = PyPDF2.PdfReader(file)
+                                text = ""
+                                for page_num in range(len(reader.pages)):
+                                    page = reader.pages[page_num]
+                                    text += page.extract_text() + "\n\n"
+                        except ImportError:
+                            # If PyPDF2 is not installed, use a placeholder
+                            text = "[PDF file content - PyPDF2 not installed]"
+                    else:
+                        # Default to plain text for other file types
+                        try:
+                            with open(local_file_path, 'r', encoding='utf-8') as f:
+                                text = f.read()
+                        except UnicodeDecodeError:
+                            # If UTF-8 decoding fails, try with latin-1
+                            with open(local_file_path, 'r', encoding='latin-1') as f:
+                                text = f.read()
                     
                     # Create a single chunk
                     chunks = [
