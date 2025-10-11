@@ -121,15 +121,15 @@ async def handle_oauth_callback(provider: str, code: str, db: Session) -> Tuple[
                 user.oauth_user_id = oauth_user_id
                 user.is_verified = True  # OAuth emails are verified
             else:
-                # Create new user
+                # Create new user with OAuth provider and ID
                 user_data = UserCreate(
                     email=email,
                     name=name,
-                    password=None  # No password for OAuth users
+                    password=None,  # No password for OAuth users
+                    oauth_provider=provider,
+                    oauth_user_id=oauth_user_id
                 )
                 user = create_user(db, user_data)
-                user.oauth_provider = provider
-                user.oauth_user_id = oauth_user_id
                 user.is_verified = True
         
         # Update OAuth tokens
@@ -143,7 +143,7 @@ async def handle_oauth_callback(provider: str, code: str, db: Session) -> Tuple[
         user.last_login = datetime.utcnow()
         db.commit()
         
-        # Generate JWT tokens for our system
+        # Generate JWT tokens 
         access_token = create_access_token(data={"sub": user.id})
         refresh_token = create_refresh_token(db, user.id)
         
