@@ -59,7 +59,7 @@ class DocumentService:
                 file_size=file_info["file_size"],
                 upload_date=datetime.utcnow(),
                 processing_status="pending",
-                metadata=metadata or {}
+                document_metadata=metadata or {}
             )
             
             # Add to database
@@ -139,16 +139,16 @@ class DocumentService:
                     
                     # Update document status to completed
                     document.processing_status = "completed"
-                    document.metadata["processing_completed_at"] = datetime.utcnow().isoformat()
-                    document.metadata["chunk_count"] = len(chunks)
+                    document.document_metadata["processing_completed_at"] = datetime.utcnow().isoformat()
+                    document.document_metadata["chunk_count"] = len(chunks)
                     db.commit()
                     
                 except Exception as e:
                     # Update document status to failed
                     document.processing_status = "failed"
                     document.error_message = str(e)
-                    document.metadata["processing_error"] = str(e)
-                    document.metadata["processing_failed_at"] = datetime.utcnow().isoformat()
+                    document.document_metadata["processing_error"] = str(e)
+                    document.document_metadata["processing_failed_at"] = datetime.utcnow().isoformat()
                     db.commit()
                     
                     # Log error
@@ -211,7 +211,7 @@ class DocumentService:
                 chunk_index=i,
                 text=chunk["text"],
                 embedding=chunk.get("embedding"),
-                metadata=chunk.get("metadata", {})
+                chunk_metadata=chunk.get("metadata", {})
             )
             db.add(db_chunk)
         

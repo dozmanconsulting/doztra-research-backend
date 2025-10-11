@@ -14,7 +14,7 @@ class DocumentChunk(Base):
     chunk_index = Column(Integer, nullable=False)
     text = Column(Text, nullable=False)
     embedding = Column(JSON, nullable=True)  # Store embedding as JSON array
-    metadata = Column(JSON, nullable=True)  # For page numbers, sections, etc.
+    chunk_metadata = Column(JSON, nullable=True)  # For page numbers, sections, etc. - renamed from metadata
     
     # Relationships
     document = relationship("Document", back_populates="chunks")

@@ -126,7 +126,7 @@ async def get_document(
             "status": document.processing_status,
             "error": document.error_message if document.processing_status == "failed" else None,
             "user_id": document.user_id,
-            "metadata": document.metadata
+            "metadata": document.document_metadata
         }
         
     except HTTPException as e:

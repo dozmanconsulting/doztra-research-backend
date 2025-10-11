@@ -216,14 +216,34 @@ def create_tables(engine):
         Column('updated_at', DateTime, nullable=False, server_default=func.now(), onupdate=func.now())
     )
     
+    # Improved document tables for better storage and processing
     documents = Table(
         'documents',
         metadata,
-        Column('id', PostgresUUID(as_uuid=True), primary_key=True, default=uuid.uuid4),
+        Column('id', String, primary_key=True),  # Using string ID with doc- prefix
         Column('user_id', PostgresUUID(as_uuid=True), ForeignKey('users.id', ondelete='CASCADE'), nullable=False),
-        Column('title', String(255), nullable=False),
-        Column('content', Text, nullable=False),
-        Column('metadata', JSONB),
+        Column('title', String(255), nullable=True),
+        Column('original_filename', String(255), nullable=False),
+        Column('file_path', String(255), nullable=False),  # Path to file in storage (local or cloud)
+        Column('file_type', String(100), nullable=False),
+        Column('file_size', Integer, nullable=False),
+        Column('upload_date', DateTime, nullable=False, server_default=func.now()),
+        Column('processing_status', String(50), nullable=False, default='pending'),  # pending, processing, completed, failed
+        Column('error_message', Text, nullable=True),
+        Column('document_metadata', JSONB, nullable=True),  # Renamed from metadata to avoid SQLAlchemy conflict
+        Column('created_at', DateTime, nullable=False, server_default=func.now()),
+        Column('updated_at', DateTime, nullable=False, server_default=func.now(), onupdate=func.now())
+    )
+    
+    document_chunks = Table(
+        'document_chunks',
+        metadata,
+        Column('id', String, primary_key=True),  # Using string ID with chunk- prefix
+        Column('document_id', String, ForeignKey('documents.id', ondelete='CASCADE'), nullable=False),
+        Column('chunk_index', Integer, nullable=False),
+        Column('text', Text, nullable=False),
+        Column('embedding', JSONB, nullable=True),  # Store embedding as JSON array
+        Column('chunk_metadata', JSONB, nullable=True),  # Renamed from metadata to avoid SQLAlchemy conflict
         Column('created_at', DateTime, nullable=False, server_default=func.now()),
         Column('updated_at', DateTime, nullable=False, server_default=func.now(), onupdate=func.now())
     )
@@ -232,9 +252,11 @@ def create_tables(engine):
         'document_queries',
         metadata,
         Column('id', PostgresUUID(as_uuid=True), primary_key=True, default=uuid.uuid4),
-        Column('document_id', PostgresUUID(as_uuid=True), ForeignKey('documents.id', ondelete='CASCADE'), nullable=False),
+        Column('document_id', String, ForeignKey('documents.id', ondelete='CASCADE'), nullable=False),
         Column('query', Text, nullable=False),
         Column('response', Text, nullable=False),
+        Column('similarity_score', Float, nullable=True),
+        Column('metadata', JSONB, nullable=True),
         Column('created_at', DateTime, nullable=False, server_default=func.now()),
         Column('updated_at', DateTime, nullable=False, server_default=func.now(), onupdate=func.now())
     )
@@ -593,7 +615,121 @@ def ensure_refresh_tokens_table(engine):
             logger.info("Successfully created refresh_tokens table")
             return True
     except SQLAlchemyError as e:
-        logger.error(f"Error ensuring refresh_tokens table: {e}")
+        logger.error(f"Error ensuring refresh_tokens table: {str(e)}")
+        return False
+
+def ensure_document_tables(engine):
+    """Ensure the document tables exist with the correct structure."""
+    logger.info("Checking document tables...")
+    
+    try:
+        with engine.connect() as conn:
+            # Check if documents table exists
+            result = conn.execute(text("""
+                SELECT EXISTS (
+                    SELECT 1 
+                    FROM information_schema.tables 
+                    WHERE table_name = 'documents'
+                )
+            """))
+            documents_table_exists = result.scalar()
+            
+            # Check if document_chunks table exists
+            result = conn.execute(text("""
+                SELECT EXISTS (
+                    SELECT 1 
+                    FROM information_schema.tables 
+                    WHERE table_name = 'document_chunks'
+                )
+            """))
+            chunks_table_exists = result.scalar()
+            
+            # If both tables exist, check their structure
+            if documents_table_exists and chunks_table_exists:
+                logger.info("Document tables already exist, checking structure...")
+                
+                # Check documents table structure
+                result = conn.execute(text("""
+                    SELECT column_name, data_type 
+                    FROM information_schema.columns 
+                    WHERE table_name = 'documents'
+                """))
+                columns = {row[0]: row[1] for row in result}
+                
+                # Check for required columns
+                required_columns = [
+                    'id', 'user_id', 'original_filename', 'file_path', 
+                    'file_type', 'file_size', 'processing_status'
+                ]
+                
+                missing_columns = [col for col in required_columns if col not in columns]
+                
+                if missing_columns:
+                    logger.warning(f"Documents table missing columns: {missing_columns}")
+                    logger.info("Dropping and recreating document tables...")
+                    
+                    # Drop tables and recreate
+                    conn.execute(text("DROP TABLE IF EXISTS document_chunks CASCADE"))
+                    conn.execute(text("DROP TABLE IF EXISTS documents CASCADE"))
+                    conn.commit()
+                    
+                    # Set flags to recreate tables
+                    documents_table_exists = False
+                    chunks_table_exists = False
+                else:
+                    logger.info("Documents table structure is correct")
+            
+            # Create documents table if it doesn't exist
+            if not documents_table_exists:
+                logger.info("Creating documents table...")
+                conn.execute(text("""
+                    CREATE TABLE documents (
+                        id VARCHAR PRIMARY KEY,
+                        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                        title VARCHAR,
+                        original_filename VARCHAR NOT NULL,
+                        file_path VARCHAR NOT NULL,
+                        file_type VARCHAR NOT NULL,
+                        file_size INTEGER NOT NULL,
+                        upload_date TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT now(),
+                        processing_status VARCHAR NOT NULL DEFAULT 'pending',
+                        error_message TEXT,
+                        document_metadata JSONB,
+                        created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT now(),
+                        updated_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT now()
+                    )
+                """))
+                
+                # Create indexes
+                conn.execute(text("CREATE INDEX idx_documents_user_id ON documents(user_id)"))
+                conn.execute(text("CREATE INDEX idx_documents_status ON documents(processing_status)"))
+                conn.commit()
+                logger.info("Successfully created documents table")
+            
+            # Create document_chunks table if it doesn't exist
+            if not chunks_table_exists:
+                logger.info("Creating document_chunks table...")
+                conn.execute(text("""
+                    CREATE TABLE document_chunks (
+                        id VARCHAR PRIMARY KEY,
+                        document_id VARCHAR NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+                        chunk_index INTEGER NOT NULL,
+                        text TEXT NOT NULL,
+                        embedding JSONB,
+                        chunk_metadata JSONB,
+                        created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT now(),
+                        updated_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT now()
+                    )
+                """))
+                
+                # Create indexes
+                conn.execute(text("CREATE INDEX idx_document_chunks_document_id ON document_chunks(document_id)"))
+                conn.commit()
+                logger.info("Successfully created document_chunks table")
+            
+            return True
+    except SQLAlchemyError as e:
+        logger.error(f"Error ensuring document tables: {str(e)}")
         return False
 
 def check_tables(engine):
@@ -651,6 +787,9 @@ def main():
         
         # Ensure refresh_tokens table exists
         ensure_refresh_tokens_table(engine)
+        
+        # Ensure document tables exist with correct structure
+        ensure_document_tables(engine)
         
         # Create admin user
         create_admin_user(session)

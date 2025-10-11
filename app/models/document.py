@@ -20,7 +20,7 @@ class Document(Base):
     upload_date = Column(DateTime, default=func.now(), nullable=False)
     processing_status = Column(String, default="pending", nullable=False)  # pending, processing, completed, failed
     error_message = Column(Text, nullable=True)
-    metadata = Column(JSON, nullable=True)
+    document_metadata = Column(JSON, nullable=True)  # Renamed from metadata to avoid SQLAlchemy conflict
     
     # Relationships
     user = relationship("User", back_populates="documents")
