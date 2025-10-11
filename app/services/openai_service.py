@@ -625,11 +625,17 @@ async def store_document_chunks(chunks: List[Dict[str, Any]], document_id: str, 
         
         # Prepare records for batch insertion
         records = []
-        for chunk in chunks:
+        for i, chunk in enumerate(chunks):
+            # Ensure metadata is a dictionary
+            if isinstance(chunk.get('metadata'), dict):
+                chunk_index = chunk['metadata'].get('chunk_index', i)
+            else:
+                chunk_index = i
+                
             records.append({
-                "id": f"{document_id}_chunk_{chunk['metadata']['chunk_index']}",
+                "id": f"{document_id}_chunk_{chunk_index}",
                 "values": chunk["embedding"],
-                "metadata": chunk["metadata"],
+                "metadata": chunk.get("metadata", {}),
                 "text": chunk["text"]
             })
         
@@ -645,12 +651,20 @@ async def store_document_chunks(chunks: List[Dict[str, Any]], document_id: str, 
         
         # Remove embeddings to make the JSON file smaller
         simplified_chunks = []
-        for chunk in chunks:
+        for i, chunk in enumerate(chunks):
+            # Ensure metadata is a dictionary
+            if isinstance(chunk.get('metadata'), dict):
+                chunk_index = chunk['metadata'].get('chunk_index', i)
+                metadata = chunk['metadata']
+            else:
+                chunk_index = i
+                metadata = {"chunk_index": i}
+                
             simplified_chunk = {
-                "id": f"{document_id}_chunk_{chunk['metadata']['chunk_index']}",
-                "metadata": chunk["metadata"],
+                "id": f"{document_id}_chunk_{chunk_index}",
+                "metadata": metadata,
                 "text": chunk["text"],
-                "embedding_size": len(chunk["embedding"])
+                "embedding_size": len(chunk["embedding"]) if "embedding" in chunk else 0
             }
             simplified_chunks.append(simplified_chunk)
         
