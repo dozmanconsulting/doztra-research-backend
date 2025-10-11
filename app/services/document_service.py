@@ -119,42 +119,95 @@ class DocumentService:
                     # Download file if it's in cloud storage
                     local_file_path = await self.storage_service.download_file(file_path)
                     
+                    # Log file details
+                    import logging
+                    logger = logging.getLogger(__name__)
+                    logger.info(f"Processing document: {document_id}, file_type: {file_type}, path: {local_file_path}")
+                    
+                    # Check if file exists
+                    import os
+                    if not os.path.exists(local_file_path):
+                        raise FileNotFoundError(f"File not found at {local_file_path}")
+                    
+                    # Log file size
+                    file_size = os.path.getsize(local_file_path)
+                    logger.info(f"File size: {file_size} bytes")
+                    
                     # Simplified document processing for testing
                     # Instead of using the complex openai_process_document function,
                     # we'll just create a simple chunk from the document text
                     
                     # Read the file content based on file type
+                    text = "[Document content placeholder]"
+                    logger.info(f"Processing file type: {file_type}")
                     if file_type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
                         # Handle DOCX files
+                        logger.info("Processing DOCX file")
                         try:
                             import docx
-                            doc = docx.Document(local_file_path)
-                            text = "\n\n".join([paragraph.text for paragraph in doc.paragraphs])
-                        except ImportError:
+                            logger.info("python-docx imported successfully")
+                            try:
+                                doc = docx.Document(local_file_path)
+                                logger.info(f"DOCX loaded successfully, paragraphs: {len(doc.paragraphs)}")
+                                text = "\n\n".join([paragraph.text for paragraph in doc.paragraphs])
+                                logger.info(f"Extracted {len(text)} characters from DOCX")
+                            except Exception as e:
+                                logger.error(f"Error processing DOCX file: {str(e)}")
+                                # Try a more basic approach
+                                text = f"[Error processing DOCX: {str(e)}]"
+                        except ImportError as e:
+                            logger.error(f"python-docx not installed: {str(e)}")
                             # If python-docx is not installed, use a placeholder
                             text = "[DOCX file content - python-docx not installed]"
                     elif file_type == "application/pdf":
                         # Handle PDF files
+                        logger.info("Processing PDF file")
                         try:
                             import PyPDF2
-                            with open(local_file_path, "rb") as file:
-                                reader = PyPDF2.PdfReader(file)
-                                text = ""
-                                for page_num in range(len(reader.pages)):
-                                    page = reader.pages[page_num]
-                                    text += page.extract_text() + "\n\n"
-                        except ImportError:
+                            logger.info("PyPDF2 imported successfully")
+                            try:
+                                with open(local_file_path, "rb") as file:
+                                    reader = PyPDF2.PdfReader(file)
+                                    logger.info(f"PDF loaded successfully, pages: {len(reader.pages)}")
+                                    text = ""
+                                    for page_num in range(len(reader.pages)):
+                                        page = reader.pages[page_num]
+                                        page_text = page.extract_text()
+                                        text += page_text + "\n\n"
+                                    logger.info(f"Extracted {len(text)} characters from PDF")
+                            except Exception as e:
+                                logger.error(f"Error processing PDF file: {str(e)}")
+                                text = f"[Error processing PDF: {str(e)}]"
+                        except ImportError as e:
+                            logger.error(f"PyPDF2 not installed: {str(e)}")
                             # If PyPDF2 is not installed, use a placeholder
                             text = "[PDF file content - PyPDF2 not installed]"
                     else:
                         # Default to plain text for other file types
+                        logger.info(f"Processing text file with type: {file_type}")
                         try:
-                            with open(local_file_path, 'r', encoding='utf-8') as f:
-                                text = f.read()
-                        except UnicodeDecodeError:
-                            # If UTF-8 decoding fails, try with latin-1
-                            with open(local_file_path, 'r', encoding='latin-1') as f:
-                                text = f.read()
+                            try:
+                                with open(local_file_path, 'r', encoding='utf-8') as f:
+                                    text = f.read()
+                                logger.info(f"Successfully read file with UTF-8 encoding, {len(text)} characters")
+                            except UnicodeDecodeError as e:
+                                logger.warning(f"UTF-8 decoding failed: {str(e)}, trying latin-1")
+                                # If UTF-8 decoding fails, try with latin-1
+                                with open(local_file_path, 'r', encoding='latin-1') as f:
+                                    text = f.read()
+                                logger.info(f"Successfully read file with latin-1 encoding, {len(text)} characters")
+                        except Exception as e:
+                            logger.error(f"Error reading file: {str(e)}")
+                            # Try binary mode as a last resort
+                            try:
+                                with open(local_file_path, 'rb') as f:
+                                    binary_data = f.read()
+                                logger.info(f"Read {len(binary_data)} bytes in binary mode")
+                                # Just use the first 1000 bytes as a sample
+                                text = f"[Binary file, first 1000 bytes: {binary_data[:1000]}]"
+                            except Exception as e2:
+                                logger.error(f"Binary read also failed: {str(e2)}")
+                                text = f"[Error reading file: {str(e)}]"
                     
                     # Create a single chunk
                     chunks = [

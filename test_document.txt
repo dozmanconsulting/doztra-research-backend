@@ -1,4 +1,0 @@
-This is a test document for the improved document storage system.
-It contains multiple lines of text to test the document processing.
-The system should split this document into chunks and store them in the database.
-It should also generate embeddings for each chunk to enable semantic search.
