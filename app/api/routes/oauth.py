@@ -37,7 +37,7 @@ async def oauth_login(provider: str, redirect_uri: str = None):
         )
 
 
-@router.get("/google/callback", response_model=UserWithToken)
+@router.get("/oauth/google/callback", response_model=UserWithToken)
 async def google_oauth_callback(
     request: Request,
     db: Session = Depends(get_db),
