@@ -19,6 +19,7 @@ starlette==0.48.0
 # HTTP and API dependencies
 httpx==0.28.1
 requests==2.32.5
+aiohttp==3.10.11
 openai==2.2.0
 
 # Cloud storage dependencies
