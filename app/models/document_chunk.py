@@ -16,7 +16,7 @@ class DocumentChunk(Base):
     chunk_index = Column(Integer, nullable=False)
     text = Column(Text, nullable=False)
     embedding = Column(JSONB, nullable=True)  # Store embedding as JSONB array
-    metadata = Column(JSONB, nullable=True)  # Match DB column name: metadata (not chunk_metadata)
+    chunk_metadata = Column("metadata", JSONB, nullable=True)  # Map to DB column 'metadata' but use different attribute name
     created_at = Column(DateTime, default=func.now(), nullable=False)  # Match DB schema
     
     # Relationships
