@@ -318,6 +318,54 @@ def get_section_guidance(section_title: str, methodology: str = None) -> str:
         """
 
 
+def generate_completion(
+    system_prompt: str,
+    user_prompt: str,
+    max_tokens: int = 1000,
+    temperature: float = 0.7,
+    model: str = None
+) -> str:
+    """
+    Generate a completion using OpenAI API (synchronous version for prompt generation).
+    
+    Args:
+        system_prompt: System message to set context
+        user_prompt: User message/prompt
+        max_tokens: Maximum tokens to generate
+        temperature: Sampling temperature
+        model: Model to use (defaults to LLM_REASONING)
+        
+    Returns:
+        str: Generated completion
+    """
+    try:
+        # Use synchronous client for this function
+        import openai
+        sync_client = openai.OpenAI(api_key=settings.OPENAI_API_KEY)
+        
+        # Use provided model or default to reasoning model
+        model_name = model or settings.LLM_REASONING
+        
+        response = sync_client.chat.completions.create(
+            model=model_name,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ],
+            temperature=temperature,
+            max_tokens=max_tokens,
+            top_p=1.0,
+            frequency_penalty=0.1,
+            presence_penalty=0.1
+        )
+        
+        return response.choices[0].message.content.strip()
+        
+    except Exception as e:
+        logger.error(f"Error generating completion: {str(e)}")
+        raise Exception(f"Failed to generate completion: {str(e)}")
+
+
 async def generate_chat_response(messages: List[Dict[str, Any]]) -> str:
     """
     Generate a response for chat messages.
