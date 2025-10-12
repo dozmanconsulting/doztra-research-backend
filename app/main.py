@@ -16,7 +16,7 @@ import logging
 import os
 from typing import Optional
 
-from app.api.routes import auth, users, token_usage, user_preferences, usage_statistics, admin, subscription_plans, chat, research_projects, research_content, documents, document_queries, research, research_options, content_feedback, documents_improved, oauth
+from app.api.routes import auth, users, token_usage, user_preferences, usage_statistics, admin, subscription_plans, chat, research_projects, research_content, documents, document_queries, research, research_options, content_feedback, documents_improved, oauth, chat_widget
 from app.core.config import settings
 from app.services.auth import get_current_user, verify_token
 from app.services.admin import verify_admin_token, security
@@ -115,6 +115,7 @@ app.include_router(usage_statistics.router, prefix="/api/usage", tags=["Usage St
 app.include_router(admin.router, prefix="/api/admin", tags=["Administration"])
 app.include_router(subscription_plans.router, prefix="/api/subscription", tags=["Subscription Plans"])
 app.include_router(chat.router, prefix="/api", tags=["Chat"])
+app.include_router(chat_widget.router, prefix="/api/chat-widget", tags=["Chat Widget"])
 app.include_router(research_projects.router, prefix="/api/research/projects", tags=["Research Projects"])
 app.include_router(research_content.router, prefix="/api/research/content", tags=["Research Content"])
 app.include_router(research_options.router, prefix="/api/research/options", tags=["Research Options"])
