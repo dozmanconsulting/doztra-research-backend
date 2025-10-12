@@ -121,8 +121,9 @@ app.include_router(research_content.router, prefix="/api/research/content", tags
 app.include_router(research_options.router, prefix="/api/research/options", tags=["Research Options"])
 app.include_router(research.router, prefix="/api/research", tags=["Research Tools"])
 # Original document routes (kept for backward compatibility)
-app.include_router(documents.router, prefix="/api/documents", tags=["Documents"])
+# Register document_queries first to avoid path conflicts with documents/{document_id}
 app.include_router(document_queries.router, prefix="/api/documents", tags=["Document Queries"])
+app.include_router(documents.router, prefix="/api/documents", tags=["Documents"])
 
 # Improved document routes
 app.include_router(documents_improved.router, prefix="/api/v2/documents", tags=["Documents V2"])
