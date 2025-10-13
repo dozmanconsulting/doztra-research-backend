@@ -21,6 +21,11 @@ from app.core.config import settings
 from app.services.auth import get_current_user, verify_token
 from app.services.admin import verify_admin_token, security
 from app.db.session import get_db
+# Add to imports in main.py
+from app.api.routes import support
+
+# Add to router includes
+app.include_router(support.router, prefix="/api", tags=["Support"])
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)

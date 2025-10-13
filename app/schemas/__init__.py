@@ -7,3 +7,8 @@ from app.schemas.user_preferences import UserPreferences, UserPreferencesCreate,
 from app.schemas.usage_statistics import UsageStatistics, UsageStatisticsCreate, UsageStatisticsUpdate, UsageResponse
 from app.schemas.research_project import ResearchProject, ResearchProjectCreate, ResearchProjectUpdate, ResearchProjectList, ResearchProjectDelete
 from app.schemas.contact import ContactRequest, ContactResponse
+from app.schemas.support import (
+    SupportChatRequest, SupportChatResponse, SupportMessageRequest, 
+    SupportMessageResponse, SupportChatHistory, RepresentativeInfo, 
+    SupportStatusResponse, SupportChatStatus, RepresentativeStatus
+)
