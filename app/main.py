@@ -16,16 +16,11 @@ import logging
 import os
 from typing import Optional
 
-from app.api.routes import auth, users, token_usage, user_preferences, usage_statistics, admin, subscription_plans, chat, research_projects, research_content, documents, document_queries, research, research_options, content_feedback, documents_improved, oauth, chat_widget, prompt_generation, contact
+from app.api.routes import auth, users, token_usage, user_preferences, usage_statistics, admin, subscription_plans, chat, research_projects, research_content, documents, document_queries, research, research_options, content_feedback, documents_improved, oauth, chat_widget, prompt_generation, contact, support
 from app.core.config import settings
 from app.services.auth import get_current_user, verify_token
 from app.services.admin import verify_admin_token, security
 from app.db.session import get_db
-# Add to imports in main.py
-from app.api.routes import support
-
-# Add to router includes
-app.include_router(support.router, prefix="/api", tags=["Support"])
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -139,6 +134,9 @@ app.include_router(prompt_generation.router, prefix="/api/prompt-generation", ta
 
 # Contact routes
 app.include_router(contact.router, prefix="/api", tags=["Contact"])
+
+# Support routes
+app.include_router(support.router, prefix="/api", tags=["Support"])
 
 # Custom exception handler for validation errors
 @app.exception_handler(RequestValidationError)

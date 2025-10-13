@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.schemas.support import *
 from app.services.support_service import SupportService
-from app.models.support import Representative
+from app.models.support import Representative, SupportChat
 import logging
 
 router = APIRouter()
