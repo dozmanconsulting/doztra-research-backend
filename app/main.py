@@ -16,7 +16,7 @@ import logging
 import os
 from typing import Optional
 
-from app.api.routes import auth, users, token_usage, user_preferences, usage_statistics, admin, subscription_plans, chat, research_projects, research_content, documents, document_queries, research, research_options, content_feedback, documents_improved, oauth, chat_widget, prompt_generation
+from app.api.routes import auth, users, token_usage, user_preferences, usage_statistics, admin, subscription_plans, chat, research_projects, research_content, documents, document_queries, research, research_options, content_feedback, documents_improved, oauth, chat_widget, prompt_generation, contact
 from app.core.config import settings
 from app.services.auth import get_current_user, verify_token
 from app.services.admin import verify_admin_token, security
@@ -131,6 +131,9 @@ app.include_router(content_feedback.router, prefix="/api", tags=["Content Feedba
 
 # Prompt generation routes
 app.include_router(prompt_generation.router, prefix="/api/prompt-generation", tags=["Prompt Generation"])
+
+# Contact routes
+app.include_router(contact.router, prefix="/api", tags=["Contact"])
 
 # Custom exception handler for validation errors
 @app.exception_handler(RequestValidationError)
