@@ -173,7 +173,7 @@ class GenerateDraftRequest(BaseModel):
 class GenerateDraftResponse(BaseModel):
     """Response schema for generated draft"""
     success: bool = True
-    draft: Dict[str, Any] = Field(..., description="Complete draft with sections")
+    draft: str = Field(..., description="Complete draft in markdown format")
     metadata: DraftMetadata
     timestamp: str
 
