@@ -16,7 +16,7 @@ import logging
 import os
 from typing import Optional
 
-from app.api.routes import auth, users, token_usage, user_preferences, usage_statistics, admin, subscription_plans, chat, research_projects, research_content, documents, document_queries, research, research_options, content_feedback, documents_improved, oauth, chat_widget, prompt_generation, contact, support
+from app.api.routes import auth, users, token_usage, user_preferences, usage_statistics, admin, subscription_plans, chat, research_projects, research_content, documents, document_queries, research, research_options, content_feedback, documents_improved, oauth, chat_widget, prompt_generation, contact, support, research_generation
 from app.core.config import settings
 from app.services.auth import get_current_user, verify_token
 from app.services.admin import verify_admin_token, security
@@ -120,6 +120,7 @@ app.include_router(research_projects.router, prefix="/api/research/projects", ta
 app.include_router(research_content.router, prefix="/api/research/content", tags=["Research Content"])
 app.include_router(research_options.router, prefix="/api/research/options", tags=["Research Options"])
 app.include_router(research.router, prefix="/api/research", tags=["Research Tools"])
+app.include_router(research_generation.router, prefix="/api", tags=["Research Generation"])
 # Original document routes (kept for backward compatibility)
 # Register document_queries first to avoid path conflicts with documents/{document_id}
 app.include_router(document_queries.router, prefix="/api/documents", tags=["Document Queries"])
