@@ -507,9 +507,9 @@ Requirements:
 5. Include proper metadata (authors, year, title, publication, DOI/URL)
 6. Provide brief abstracts (2-3 sentences)
 7. Explain relevance to the research topic
-8. Create short citation keys (e.g., "Smith2020", "JonesEtAl2019")
+8. **MANDATORY**: Create short citation keys (e.g., "Smith2020", "JonesEtAl2019") - THIS FIELD IS REQUIRED
 
-Return as a JSON object with this structure:
+Return as a JSON object with this EXACT structure (ALL fields are required):
 {{
   "sources": [
     {{
@@ -527,7 +527,11 @@ Return as a JSON object with this structure:
   ]
 }}
 
-CRITICAL: Return ONLY valid JSON. No explanatory text, no markdown formatting, no code blocks."""
+CRITICAL REQUIREMENTS:
+- Return ONLY valid JSON
+- ALL fields must be present for each source
+- citationKey is MANDATORY (format: AuthorYear or AuthorEtAlYear)
+- No explanatory text, no markdown formatting, no code blocks"""
 
     try:
         response = await client.chat.completions.create(
@@ -566,11 +570,32 @@ CRITICAL: Return ONLY valid JSON. No explanatory text, no markdown formatting, n
         
         # Handle both array and object formats
         if isinstance(result, list):
-            return {"sources": result}
+            sources = result
         elif isinstance(result, dict) and "sources" in result:
-            return result
+            sources = result["sources"]
         else:
             raise ValueError("Unexpected JSON format from GPT-4")
+        
+        # Add citationKey if missing (fallback)
+        for source in sources:
+            if "citationKey" not in source or not source["citationKey"]:
+                # Generate citation key from authors and year
+                authors = source.get("authors", [])
+                year = source.get("year", "")
+                if authors and year:
+                    first_author = authors[0].split(",")[0].strip()
+                    if len(authors) > 2:
+                        citation_key = f"{first_author}EtAl{year}"
+                    elif len(authors) == 2:
+                        second_author = authors[1].split(",")[0].strip()
+                        citation_key = f"{first_author}{second_author}{year}"
+                    else:
+                        citation_key = f"{first_author}{year}"
+                    source["citationKey"] = citation_key
+                else:
+                    source["citationKey"] = f"Source{source.get('id', 'Unknown')}"
+        
+        return {"sources": sources}
         
     except Exception as e:
         print(f"Error generating sources: {str(e)}")
