@@ -158,6 +158,24 @@ class DraftMetadata(BaseModel):
     country: str
 
 
+# ============================================================================
+# Generate Sources Schemas
+# ============================================================================
+
+class AcademicSource(BaseModel):
+    """Single academic source/reference"""
+    id: str = Field(..., description="Unique identifier for the source")
+    authors: List[str] = Field(..., description="List of author names")
+    year: int = Field(..., description="Publication year")
+    title: str = Field(..., description="Article/book title")
+    publication: str = Field(..., description="Journal/publisher name")
+    doi: Optional[str] = Field(None, description="DOI if available")
+    url: Optional[str] = Field(None, description="URL if available")
+    abstract: str = Field(..., description="Brief abstract or summary")
+    relevance: str = Field(..., description="Why this source is relevant")
+    citationKey: str = Field(..., description="Short citation key (e.g., 'Smith2020')")
+
+
 class GenerateDraftRequest(BaseModel):
     """Request schema for generating full draft"""
     topic: str
@@ -181,24 +199,6 @@ class GenerateDraftResponse(BaseModel):
     draft: str = Field(..., description="Complete draft in markdown format")
     metadata: DraftMetadata
     timestamp: str
-
-
-# ============================================================================
-# Generate Sources Schemas
-# ============================================================================
-
-class AcademicSource(BaseModel):
-    """Single academic source/reference"""
-    id: str = Field(..., description="Unique identifier for the source")
-    authors: List[str] = Field(..., description="List of author names")
-    year: int = Field(..., description="Publication year")
-    title: str = Field(..., description="Article/book title")
-    publication: str = Field(..., description="Journal/publisher name")
-    doi: Optional[str] = Field(None, description="DOI if available")
-    url: Optional[str] = Field(None, description="URL if available")
-    abstract: str = Field(..., description="Brief abstract or summary")
-    relevance: str = Field(..., description="Why this source is relevant")
-    citationKey: str = Field(..., description="Short citation key (e.g., 'Smith2020')")
 
 
 class GenerateSourcesRequest(BaseModel):
