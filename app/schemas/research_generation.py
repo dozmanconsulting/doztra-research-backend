@@ -183,6 +183,43 @@ class GenerateDraftResponse(BaseModel):
 
 
 # ============================================================================
+# Generate Sources Schemas
+# ============================================================================
+
+class AcademicSource(BaseModel):
+    """Single academic source/reference"""
+    id: str = Field(..., description="Unique identifier for the source")
+    authors: List[str] = Field(..., description="List of author names")
+    year: int = Field(..., description="Publication year")
+    title: str = Field(..., description="Article/book title")
+    publication: str = Field(..., description="Journal/publisher name")
+    doi: Optional[str] = Field(None, description="DOI if available")
+    url: Optional[str] = Field(None, description="URL if available")
+    abstract: str = Field(..., description="Brief abstract or summary")
+    relevance: str = Field(..., description="Why this source is relevant")
+    citationKey: str = Field(..., description="Short citation key (e.g., 'Smith2020')")
+
+
+class GenerateSourcesRequest(BaseModel):
+    """Request schema for generating academic sources"""
+    topic: str
+    discipline: str
+    faculty: Optional[str] = None
+    country: str
+    type: str
+    numberOfSources: str = Field(..., description="Number of sources (3-4, 4-7, 8-12, 12+)")
+    researchGuidelines: Optional[str] = None
+    timestamp: str
+
+
+class GenerateSourcesResponse(BaseModel):
+    """Response schema for generated sources"""
+    success: bool = True
+    sources: List[AcademicSource]
+    timestamp: str
+
+
+# ============================================================================
 # Error Response Schema
 # ============================================================================
 

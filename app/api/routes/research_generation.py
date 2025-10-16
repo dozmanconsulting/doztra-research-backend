@@ -13,6 +13,7 @@ from app.schemas.research_generation import (
     ImproveTopicRequest, ImproveTopicResponse,
     AlternativeTopicRequest, AlternativeTopicResponse,
     GenerateOutlineRequest, GenerateOutlineResponse,
+    GenerateSourcesRequest, GenerateSourcesResponse,
     GenerateDraftRequest, GenerateDraftResponse,
     UploadDocumentsResponse, ProcessedDocument,
     ErrorResponse
@@ -197,6 +198,42 @@ async def upload_documents(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error processing documents: {str(e)}"
+        )
+
+
+@router.post("/generate-sources", response_model=GenerateSourcesResponse)
+async def generate_sources_endpoint(
+    request: GenerateSourcesRequest,
+    current_user: User = Depends(get_current_active_user)
+) -> Any:
+    """
+    Generate academic sources/references for research
+    
+    Creates a list of relevant academic sources that can be used
+    for citations in the research paper.
+    """
+    try:
+        result = await research_generation.generate_sources(
+            topic=request.topic,
+            discipline=request.discipline,
+            faculty=request.faculty,
+            country=request.country,
+            research_type=request.type,
+            number_of_sources=request.numberOfSources,
+            research_guidelines=request.researchGuidelines
+        )
+        
+        return GenerateSourcesResponse(
+            success=True,
+            sources=result["sources"],
+            timestamp=datetime.now().isoformat()
+        )
+        
+    except Exception as e:
+        print(f"Error in generate_sources endpoint: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error generating sources: {str(e)}"
         )
 
 

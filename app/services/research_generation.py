@@ -433,3 +433,104 @@ Use markdown formatting for structure (# for main headings, ## for subheadings, 
     except Exception as e:
         print(f"Error generating draft: {str(e)}")
         raise
+
+
+async def generate_sources(
+    topic: str,
+    discipline: str,
+    faculty: Optional[str],
+    country: str,
+    research_type: str,
+    number_of_sources: str,
+    research_guidelines: Optional[str]
+) -> Dict[str, Any]:
+    """
+    Generate academic sources/references for a research topic
+    
+    Args:
+        topic: Research topic
+        discipline: Academic discipline
+        faculty: Faculty/specialization (optional)
+        country: Country for academic standards
+        research_type: Type of research
+        number_of_sources: Number of sources to generate
+        research_guidelines: Additional guidelines (optional)
+        
+    Returns:
+        Dictionary with list of academic sources
+    """
+    
+    guidelines_text = f"\n\nResearch Guidelines:\n{research_guidelines}" if research_guidelines else ""
+    
+    # Parse number of sources
+    source_count = 8  # default
+    if "3-4" in number_of_sources:
+        source_count = 4
+    elif "4-7" in number_of_sources:
+        source_count = 6
+    elif "8-12" in number_of_sources:
+        source_count = 10
+    elif "12+" in number_of_sources:
+        source_count = 15
+    
+    prompt = f"""You are an expert academic librarian. Generate {source_count} realistic academic sources for a research paper.
+
+Research Details:
+- Topic: {topic}
+- Discipline: {discipline}
+- Faculty: {faculty or 'Not specified'}
+- Country: {country}
+- Type: {research_type}{guidelines_text}
+
+Requirements:
+1. Generate {source_count} REALISTIC academic sources (journal articles, books, reports)
+2. Sources should be from reputable publishers and journals in {discipline}
+3. Include recent sources (last 5-10 years) and some seminal works
+4. Each source should be directly relevant to the topic
+5. Include proper metadata (authors, year, title, publication, DOI/URL)
+6. Provide brief abstracts (2-3 sentences)
+7. Explain relevance to the research topic
+8. Create short citation keys (e.g., "Smith2020", "JonesEtAl2019")
+
+Return as a JSON array with this structure:
+[
+  {{
+    "id": "unique-id-1",
+    "authors": ["Smith, J.", "Doe, A."],
+    "year": 2020,
+    "title": "Article Title Here",
+    "publication": "Journal of {discipline}",
+    "doi": "10.1234/example.2020.001",
+    "url": "https://doi.org/10.1234/example.2020.001",
+    "abstract": "Brief abstract explaining the research...",
+    "relevance": "This source is relevant because...",
+    "citationKey": "SmithDoe2020"
+  }}
+]
+
+Return ONLY the JSON array, no additional text."""
+
+    try:
+        response = await client.chat.completions.create(
+            model="gpt-4-turbo-preview",
+            messages=[
+                {"role": "system", "content": "You are an expert academic librarian specializing in research source recommendations."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.7,
+            max_tokens=3000
+        )
+        
+        sources_json = response.choices[0].message.content
+        
+        # Parse JSON response
+        import json
+        sources = json.loads(sources_json)
+        
+        return {
+            "sources": sources
+        }
+        
+    except Exception as e:
+        print(f"Error generating sources: {str(e)}")
+        raise
