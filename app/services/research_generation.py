@@ -388,18 +388,20 @@ Outline to Follow:
 {outline_text}
 
 Requirements:
-1. Write a complete, well-researched academic paper following the outline
-2. Follow {country} academic writing standards and conventions
-3. Use {discipline}-appropriate methodology and terminology
-4. **CRITICAL**: Include proper {citation} in-text citations using the PROVIDED sources above
-5. Cite sources naturally throughout the text where relevant (e.g., "According to Smith (2020)..." or "...has been demonstrated (Jones, 2019)")
-6. Write in formal academic tone appropriate for {research_type}
-7. Include country-specific context and examples relevant to {country}
-8. Ensure content is original, coherent, and properly structured
-9. Each major section should be substantive and well-developed
-10. Include transitions between sections
-11. Aim for approximately {length} in total length
-12. Use ONLY the provided sources for citations - do not invent new ones
+1. **CRITICAL**: Write the COMPLETE, FULL academic paper - NO disclaimers, NO mentions of "platform constraints", NO partial content
+2. Write a complete, well-researched academic paper following the outline
+3. Follow {country} academic writing standards and conventions
+4. Use {discipline}-appropriate methodology and terminology
+5. **CRITICAL**: Include proper {citation} in-text citations using the PROVIDED sources above
+6. Cite sources naturally throughout the text where relevant (e.g., "According to Smith (2020)..." or "...has been demonstrated (Jones, 2019)")
+7. Write in formal academic tone appropriate for {research_type}
+8. Include country-specific context and examples relevant to {country}
+9. Ensure content is original, coherent, and properly structured
+10. Each major section should be substantive and well-developed
+11. Include transitions between sections
+12. Aim for approximately {length} in total length
+13. Use ONLY the provided sources for citations - do not invent new ones
+14. **DO NOT** include any meta-commentary about limitations or constraints - just write the paper
 
 Generate the full draft with:
 - Title
@@ -416,11 +418,11 @@ Use markdown formatting for structure (# for main headings, ## for subheadings, 
         response = await client.chat.completions.create(
             model="gpt-4-turbo-preview",
             messages=[
-                {"role": "system", "content": "You are an expert academic writer specializing in research papers across multiple disciplines."},
+                {"role": "system", "content": "You are an expert academic writer specializing in research papers across multiple disciplines. You ALWAYS generate complete, full-length academic papers without disclaimers or limitations. Never mention platform constraints - just write the complete paper as requested."},
                 {"role": "user", "content": prompt}
             ],
             temperature=0.7,
-            max_tokens=4000  # Adjust based on length requirements
+            max_tokens=16000  # Increased for full-length papers (GPT-4 Turbo supports up to 128k context, 4k output)
         )
         
         draft_content = response.choices[0].message.content
