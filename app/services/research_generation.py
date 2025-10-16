@@ -415,6 +415,10 @@ Format the output as a single cohesive document with clear section headings.
 Use markdown formatting for structure (# for main headings, ## for subheadings, etc.)."""
 
     try:
+        # Note: GPT-4 Turbo Preview has a max output of 4096 tokens (~3000 words)
+        # For longer papers, consider:
+        # - Using "gpt-4o" or "gpt-4o-mini" (supports up to 16k output tokens)
+        # - Generating sections separately and combining them
         response = await client.chat.completions.create(
             model="gpt-4-turbo-preview",
             messages=[
@@ -422,7 +426,7 @@ Use markdown formatting for structure (# for main headings, ## for subheadings, 
                 {"role": "user", "content": prompt}
             ],
             temperature=0.7,
-            max_tokens=16000  # Increased for full-length papers (GPT-4 Turbo supports up to 128k context, 4k output)
+            max_tokens=4096  # Maximum for GPT-4 Turbo Preview model
         )
         
         draft_content = response.choices[0].message.content
