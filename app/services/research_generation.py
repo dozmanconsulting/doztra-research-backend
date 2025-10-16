@@ -509,45 +509,70 @@ Requirements:
 7. Explain relevance to the research topic
 8. Create short citation keys (e.g., "Smith2020", "JonesEtAl2019")
 
-Return as a JSON array with this structure:
-[
-  {{
-    "id": "unique-id-1",
-    "authors": ["Smith, J.", "Doe, A."],
-    "year": 2020,
-    "title": "Article Title Here",
-    "publication": "Journal of {discipline}",
-    "doi": "10.1234/example.2020.001",
-    "url": "https://doi.org/10.1234/example.2020.001",
-    "abstract": "Brief abstract explaining the research...",
-    "relevance": "This source is relevant because...",
-    "citationKey": "SmithDoe2020"
-  }}
-]
+Return as a JSON object with this structure:
+{{
+  "sources": [
+    {{
+      "id": "unique-id-1",
+      "authors": ["Smith, J.", "Doe, A."],
+      "year": 2020,
+      "title": "Article Title Here",
+      "publication": "Journal of {discipline}",
+      "doi": "10.1234/example.2020.001",
+      "url": "https://doi.org/10.1234/example.2020.001",
+      "abstract": "Brief abstract explaining the research...",
+      "relevance": "This source is relevant because...",
+      "citationKey": "SmithDoe2020"
+    }}
+  ]
+}}
 
-Return ONLY the JSON array, no additional text."""
+CRITICAL: Return ONLY valid JSON. No explanatory text, no markdown formatting, no code blocks."""
 
     try:
         response = await client.chat.completions.create(
             model="gpt-4-turbo-preview",
             messages=[
-                {"role": "system", "content": "You are an expert academic librarian specializing in research source recommendations."},
+                {"role": "system", "content": "You are an expert academic librarian. You ONLY respond with valid JSON arrays, no other text."},
                 {"role": "user", "content": prompt}
             ],
             temperature=0.7,
-            max_tokens=3000
+            max_tokens=3000,
+            response_format={"type": "json_object"}
         )
         
         sources_json = response.choices[0].message.content
         
         # Parse JSON response
         import json
-        sources = json.loads(sources_json)
+        import re
         
-        return {
-            "sources": sources
-        }
+        # Clean up the response - remove markdown code blocks if present
+        cleaned_json = sources_json.strip()
+        
+        # Remove ```json and ``` markers if present
+        if cleaned_json.startswith('```'):
+            # Extract content between ``` markers
+            match = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', cleaned_json, re.DOTALL)
+            if match:
+                cleaned_json = match.group(1)
+            else:
+                # Try to find just the object
+                match = re.search(r'(\{.*\})', cleaned_json, re.DOTALL)
+                if match:
+                    cleaned_json = match.group(1)
+        
+        result = json.loads(cleaned_json)
+        
+        # Handle both array and object formats
+        if isinstance(result, list):
+            return {"sources": result}
+        elif isinstance(result, dict) and "sources" in result:
+            return result
+        else:
+            raise ValueError("Unexpected JSON format from GPT-4")
         
     except Exception as e:
         print(f"Error generating sources: {str(e)}")
+        print(f"Raw response: {response.choices[0].message.content if 'response' in locals() else 'No response'}")
         raise
