@@ -169,6 +169,7 @@ class GenerateDraftRequest(BaseModel):
     faculty: Optional[str] = None
     country: str
     sources: str = Field(..., description="Number of sources (3-4, 8-12, etc.)")
+    selectedSources: Optional[List[AcademicSource]] = Field(default=[], description="Selected academic sources for citations")
     researchGuidelines: Optional[str] = None
     uploadedDocuments: Optional[List[UploadedDocumentContent]] = Field(default=[])
     timestamp: str

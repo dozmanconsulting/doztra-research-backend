@@ -259,6 +259,21 @@ async def generate_draft(
             for doc in (request.uploadedDocuments or [])
         ]
         
+        # Convert selected sources to dict format
+        selected_sources = [
+            {
+                "id": source.id,
+                "authors": source.authors,
+                "year": source.year,
+                "title": source.title,
+                "publication": source.publication,
+                "doi": source.doi,
+                "url": source.url,
+                "citationKey": source.citationKey
+            }
+            for source in (request.selectedSources or [])
+        ]
+        
         result = await research_generation.generate_draft(
             topic=request.topic,
             outline=request.outline,
@@ -269,6 +284,7 @@ async def generate_draft(
             citation=request.citation,
             length=request.length,
             sources=request.sources,
+            selected_sources=selected_sources,
             research_guidelines=request.researchGuidelines,
             uploaded_documents=uploaded_docs
         )

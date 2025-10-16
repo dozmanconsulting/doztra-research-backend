@@ -318,6 +318,7 @@ async def generate_draft(
     citation: str,
     length: str,
     sources: str,
+    selected_sources: List[Dict[str, Any]],
     research_guidelines: Optional[str],
     uploaded_documents: List[Dict[str, str]]
 ) -> Dict[str, Any]:
@@ -358,6 +359,19 @@ async def generate_draft(
     # Format outline for prompt
     outline_text = "\n".join(outline)
     
+    # Format selected sources for prompt
+    sources_text = ""
+    if selected_sources and len(selected_sources) > 0:
+        sources_list = []
+        for source in selected_sources:
+            authors_str = ", ".join(source['authors'])
+            source_entry = f"[{source['citationKey']}] {authors_str} ({source['year']}). {source['title']}. {source['publication']}."
+            if source.get('doi'):
+                source_entry += f" DOI: {source['doi']}"
+            sources_list.append(source_entry)
+        sources_text = "\n\nSelected Academic Sources (USE THESE FOR CITATIONS):\n" + "\n".join(sources_list)
+        sources_text += f"\n\nIMPORTANT: Use these exact sources for your in-text citations. Cite them using their citation keys (e.g., {selected_sources[0]['citationKey']}, {source['year']}) in {citation} format."
+    
     prompt = f"""You are an expert academic writer. Generate a comprehensive research paper draft.
 
 Research Details:
@@ -368,7 +382,7 @@ Research Details:
 - Country: {country}
 - Citation Style: {citation}
 - Length: {length}
-- Required Sources: {sources}{guidelines_text}{documents_context}
+- Required Sources: {sources}{guidelines_text}{documents_context}{sources_text}
 
 Outline to Follow:
 {outline_text}
@@ -377,20 +391,23 @@ Requirements:
 1. Write a complete, well-researched academic paper following the outline
 2. Follow {country} academic writing standards and conventions
 3. Use {discipline}-appropriate methodology and terminology
-4. Include proper {citation} in-text citations (use placeholder citations like [Author, Year])
-5. Write in formal academic tone appropriate for {research_type}
-6. Include country-specific context and examples relevant to {country}
-7. Ensure content is original, coherent, and properly structured
-8. Each major section should be substantive and well-developed
-9. Include transitions between sections
-10. Aim for approximately {length} in total length
+4. **CRITICAL**: Include proper {citation} in-text citations using the PROVIDED sources above
+5. Cite sources naturally throughout the text where relevant (e.g., "According to Smith (2020)..." or "...has been demonstrated (Jones, 2019)")
+6. Write in formal academic tone appropriate for {research_type}
+7. Include country-specific context and examples relevant to {country}
+8. Ensure content is original, coherent, and properly structured
+9. Each major section should be substantive and well-developed
+10. Include transitions between sections
+11. Aim for approximately {length} in total length
+12. Use ONLY the provided sources for citations - do not invent new ones
 
 Generate the full draft with:
 - Title
 - Abstract (150-250 words)
 - All sections from the outline with detailed content
+- **Inline citations throughout using the provided sources**
 - Conclusion
-- References section (list {sources} placeholder references in {citation} format)
+- ## References section with ALL cited sources formatted in {citation} style
 
 Format the output as a single cohesive document with clear section headings.
 Use markdown formatting for structure (# for main headings, ## for subheadings, etc.)."""
