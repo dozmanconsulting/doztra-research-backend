@@ -151,7 +151,11 @@ class DraftMetadata(BaseModel):
     generatedAt: str
     processingTime: str
     aiModel: str
-    qualityScore: int
+    wordCount: int
+    pageCount: int
+    citationStyle: str
+    discipline: str
+    country: str
 
 
 class GenerateDraftRequest(BaseModel):
