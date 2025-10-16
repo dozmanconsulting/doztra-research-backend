@@ -341,28 +341,95 @@ async def generate_draft(
         Dictionary with complete draft and metadata
     """
     
-    # This is a complex operation that would typically be done in chunks
-    # For now, return a placeholder structure
+    start_time = datetime.now()
     
-    return {
-        "draft": {
-            "title": topic,
-            "abstract": "Abstract will be generated here...",
-            "sections": [
-                {
-                    "heading": "Chapter 1: Introduction",
-                    "content": "Introduction content will be generated here...",
-                    "wordCount": 1500
-                }
+    # Prepare context from uploaded documents
+    documents_context = ""
+    if uploaded_documents and len(uploaded_documents) > 0:
+        docs_list = []
+        for doc in uploaded_documents:
+            if doc.get('content'):
+                docs_list.append(f"Document: {doc['fileName']}\n{doc['content'][:1000]}...")
+        if docs_list:
+            documents_context = f"\n\nReference Documents:\n" + "\n\n".join(docs_list)
+    
+    guidelines_text = f"\n\nResearch Guidelines:\n{research_guidelines}" if research_guidelines else ""
+    
+    # Format outline for prompt
+    outline_text = "\n".join(outline)
+    
+    prompt = f"""You are an expert academic writer. Generate a comprehensive research paper draft.
+
+Research Details:
+- Topic: {topic}
+- Type: {research_type}
+- Discipline: {discipline}
+- Faculty: {faculty or 'Not specified'}
+- Country: {country}
+- Citation Style: {citation}
+- Length: {length}
+- Required Sources: {sources}{guidelines_text}{documents_context}
+
+Outline to Follow:
+{outline_text}
+
+Requirements:
+1. Write a complete, well-researched academic paper following the outline
+2. Follow {country} academic writing standards and conventions
+3. Use {discipline}-appropriate methodology and terminology
+4. Include proper {citation} in-text citations (use placeholder citations like [Author, Year])
+5. Write in formal academic tone appropriate for {research_type}
+6. Include country-specific context and examples relevant to {country}
+7. Ensure content is original, coherent, and properly structured
+8. Each major section should be substantive and well-developed
+9. Include transitions between sections
+10. Aim for approximately {length} in total length
+
+Generate the full draft with:
+- Title
+- Abstract (150-250 words)
+- All sections from the outline with detailed content
+- Conclusion
+- References section (list {sources} placeholder references in {citation} format)
+
+Format the output as a single cohesive document with clear section headings.
+Use markdown formatting for structure (# for main headings, ## for subheadings, etc.)."""
+
+    try:
+        response = await client.chat.completions.create(
+            model="gpt-4-turbo-preview",
+            messages=[
+                {"role": "system", "content": "You are an expert academic writer specializing in research papers across multiple disciplines."},
+                {"role": "user", "content": prompt}
             ],
-            "references": [],
-            "totalWordCount": 0,
-            "pageCount": 0
-        },
-        "metadata": {
-            "generatedAt": datetime.now().isoformat(),
-            "processingTime": "15 minutes",
-            "aiModel": "GPT-4",
-            "qualityScore": 95
+            temperature=0.7,
+            max_tokens=4000  # Adjust based on length requirements
+        )
+        
+        draft_content = response.choices[0].message.content
+        
+        # Calculate processing time
+        end_time = datetime.now()
+        processing_time = (end_time - start_time).total_seconds()
+        
+        # Estimate word count (rough approximation)
+        word_count = len(draft_content.split())
+        page_count = word_count // 250  # Approximate pages (250 words per page)
+        
+        return {
+            "draft": draft_content,
+            "metadata": {
+                "generatedAt": end_time.isoformat(),
+                "processingTime": f"{processing_time:.1f} seconds",
+                "aiModel": "GPT-4 Turbo",
+                "wordCount": word_count,
+                "pageCount": page_count,
+                "citationStyle": citation,
+                "discipline": discipline,
+                "country": country
+            }
         }
-    }
+        
+    except Exception as e:
+        print(f"Error generating draft: {str(e)}")
+        raise
