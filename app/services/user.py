@@ -142,7 +142,8 @@ def create_user(db: Session, user_in: UserCreate) -> User:
         token_limit = 500000
         max_model_tier = ModelTier.GPT_4
     elif plan == SubscriptionPlan.PROFESSIONAL:
-        token_limit = None  # Unlimited
+        # Use a very large number to represent "unlimited" due to NOT NULL constraint
+        token_limit = 2147483647
         max_model_tier = ModelTier.GPT_4_TURBO
     
     # Create subscription for the user
@@ -341,6 +342,10 @@ def update_subscription(
         )
         db.add(db_subscription)
     
+    # Ensure tokens_limit is never None to satisfy NOT NULL constraint
+    if token_limit is None:
+        token_limit = 0
+
     # Update user's usage statistics token limit
     if user.usage_statistics:
         user.usage_statistics.tokens_limit = token_limit
