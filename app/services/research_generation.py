@@ -224,7 +224,7 @@ Requirements:
 3. Include sections appropriate for a {research_type}
 4. Ensure the structure supports {citation} citation format
 5. Design for a {length} paper
-6. Include country-specific context where relevant (e.g., "Context in {country}")
+6. Include country-specific sections where relevant (e.g., "{country} Landscape", "Industry Overview in {country}", or "{country} Perspective")
 7. Include discipline-specific perspectives (e.g., "{discipline} Perspective")
 
 Provide the outline as a JSON array of strings, where indentation is represented by leading spaces (2 spaces per level).
@@ -236,7 +236,7 @@ Example format:
   "Table of Contents",
   "Chapter 1: Introduction",
   "  1.1 Background",
-  "  1.2 Context in {country}",
+  "  1.2 {country} Landscape",
   "  1.3 {discipline} Perspective",
   "  1.4 Research Questions",
   "Chapter 2: Literature Review",
@@ -372,7 +372,7 @@ async def generate_draft(
         sources_text = "\n\nSelected Academic Sources (USE THESE FOR CITATIONS):\n" + "\n".join(sources_list)
         sources_text += f"\n\nIMPORTANT: Use these exact sources for your in-text citations. Cite them using their citation keys (e.g., {selected_sources[0]['citationKey']}, {source['year']}) in {citation} format."
     
-    prompt = f"""You are an expert academic writer. Generate a comprehensive research paper draft.
+    prompt = f"""WRITE THE COMPLETE ACADEMIC PAPER NOW. Do not write any disclaimers, explanations, or meta-commentary. Start directly with the title.
 
 Research Details:
 - Topic: {topic}
@@ -387,32 +387,25 @@ Research Details:
 Outline to Follow:
 {outline_text}
 
-Requirements:
-1. **CRITICAL**: Write the COMPLETE, FULL academic paper - NO disclaimers, NO mentions of "platform constraints", NO partial content
-2. Write a complete, well-researched academic paper following the outline
-3. Follow {country} academic writing standards and conventions
-4. Use {discipline}-appropriate methodology and terminology
-5. **CRITICAL**: Include proper {citation} in-text citations using the PROVIDED sources above
-6. Cite sources naturally throughout the text where relevant (e.g., "According to Smith (2020)..." or "...has been demonstrated (Jones, 2019)")
-7. Write in formal academic tone appropriate for {research_type}
-8. Include country-specific context and examples relevant to {country}
-9. Ensure content is original, coherent, and properly structured
-10. Each major section should be substantive and well-developed
-11. Include transitions between sections
-12. Aim for approximately {length} in total length
-13. Use ONLY the provided sources for citations - do not invent new ones
-14. **DO NOT** include any meta-commentary about limitations or constraints - just write the paper
+MANDATORY REQUIREMENTS - NO EXCEPTIONS:
+1. START IMMEDIATELY with "# [Title]" - NO introductory text, NO disclaimers, NO explanations
+2. Write the COMPLETE academic paper following the outline
+3. Include proper {citation} in-text citations using the PROVIDED sources
+4. Follow {country} academic writing standards
+5. Use {discipline}-appropriate methodology and terminology
+6. Write in formal academic tone for {research_type}
+7. Each section must be substantive and well-developed
+8. Aim for {length} in total length
+9. **CRITICAL**: End with a "## References" section containing ACTUAL FORMATTED REFERENCES in {citation} format
+   - DO NOT write "[Proper references would be listed here]" or any placeholder text
+   - DO NOT write "based on the citation keys provided" or similar meta-commentary
+   - WRITE THE ACTUAL FULL REFERENCES for each source you cited
+   - Format each reference properly in {citation} style with authors, year, title, publication, etc.
 
-Generate the full draft with:
-- Title
-- Abstract (150-250 words)
-- All sections from the outline with detailed content
-- **Inline citations throughout using the provided sources**
-- Conclusion
-- ## References section with ALL cited sources formatted in {citation} style
+CRITICAL: Your response must begin with "# " followed by the paper title. Nothing else. No disclaimers. No explanations. Just the paper.
+The References section must contain actual formatted references, not placeholder text.
 
-Format the output as a single cohesive document with clear section headings.
-Use markdown formatting for structure (# for main headings, ## for subheadings, etc.)."""
+START WRITING THE PAPER NOW:"""
 
     try:
         # Note: GPT-4 Turbo Preview has a max output of 4096 tokens (~3000 words)
@@ -422,7 +415,7 @@ Use markdown formatting for structure (# for main headings, ## for subheadings, 
         response = await client.chat.completions.create(
             model="gpt-4-turbo-preview",
             messages=[
-                {"role": "system", "content": "You are an expert academic writer specializing in research papers across multiple disciplines. You ALWAYS generate complete, full-length academic papers without disclaimers or limitations. Never mention platform constraints - just write the complete paper as requested."},
+                {"role": "system", "content": "You are an expert academic writer. You write complete academic papers immediately without any disclaimers, explanations, or meta-commentary. You NEVER mention platform constraints, limitations, or inability to complete tasks. You start every response with the paper title using markdown format. You write the full paper as requested."},
                 {"role": "user", "content": prompt}
             ],
             temperature=0.7,
@@ -430,6 +423,89 @@ Use markdown formatting for structure (# for main headings, ## for subheadings, 
         )
         
         draft_content = response.choices[0].message.content
+        
+        # Post-process to remove any disclaimers that GPT might have added
+        # Look for common disclaimer patterns at the start
+        disclaimer_patterns = [
+            "Due to the constraints of this platform",
+            "I cannot generate a full",
+            "I am unable to generate",
+            "However, I can provide",
+            "I can help you with creating an outline",
+            "Let me know how I can assist you further"
+        ]
+        
+        # Check if content starts with a disclaimer
+        for pattern in disclaimer_patterns:
+            if pattern.lower() in draft_content[:500].lower():
+                # Find where the actual content starts (usually after "---" or first heading)
+                lines = draft_content.split('\n')
+                start_index = 0
+                for i, line in enumerate(lines):
+                    # Look for the first markdown heading or "---"
+                    if line.strip().startswith('#') or line.strip() == '---':
+                        start_index = i
+                        break
+                
+                # Remove everything before the actual content
+                if start_index > 0:
+                    draft_content = '\n'.join(lines[start_index:])
+                    print(f"Removed disclaimer from draft. Started content from line {start_index}")
+                break
+        
+        # Check for placeholder references and replace with actual references if needed
+        placeholder_ref_patterns = [
+            "[Proper references",
+            "would be listed here",
+            "based on the citation keys",
+            "[References formatted in"
+        ]
+        
+        references_section_has_placeholder = False
+        for pattern in placeholder_ref_patterns:
+            if pattern.lower() in draft_content.lower():
+                references_section_has_placeholder = True
+                print(f"Warning: Detected placeholder reference text: '{pattern}'")
+                break
+        
+        # If placeholder detected and we have selected sources, generate proper references
+        if references_section_has_placeholder and selected_sources and len(selected_sources) > 0:
+            print("Generating proper references from selected sources...")
+            
+            # Format references based on citation style
+            formatted_refs = []
+            for source in selected_sources:
+                authors_str = ", ".join(source['authors'])
+                if citation.lower() == 'apa 7' or citation.lower() == 'apa':
+                    ref = f"{authors_str} ({source['year']}). {source['title']}. *{source['publication']}*."
+                elif citation.lower() == 'mla 9' or citation.lower() == 'mla':
+                    ref = f"{authors_str}. \"{source['title']}.\" *{source['publication']}*, {source['year']}."
+                elif citation.lower() == 'chicago':
+                    ref = f"{authors_str}. \"{source['title']}.\" *{source['publication']}* ({source['year']})."
+                else:  # Harvard or default
+                    ref = f"{authors_str} ({source['year']}) '{source['title']}', *{source['publication']}*."
+                
+                if source.get('doi'):
+                    ref += f" https://doi.org/{source['doi']}"
+                
+                formatted_refs.append(ref)
+            
+            # Replace the References section
+            if "## References" in draft_content or "## REFERENCES" in draft_content:
+                # Find and replace the References section
+                lines = draft_content.split('\n')
+                ref_start_idx = -1
+                for i, line in enumerate(lines):
+                    if line.strip().lower() == "## references":
+                        ref_start_idx = i
+                        break
+                
+                if ref_start_idx >= 0:
+                    # Keep everything before References section and add new references
+                    new_content = '\n'.join(lines[:ref_start_idx + 1])
+                    new_content += "\n\n" + '\n\n'.join(formatted_refs)
+                    draft_content = new_content
+                    print(f"Replaced placeholder references with {len(formatted_refs)} actual references")
         
         # Calculate processing time
         end_time = datetime.now()
