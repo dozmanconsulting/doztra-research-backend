@@ -2,7 +2,7 @@ from datetime import datetime, timedelta
 from typing import Optional
 from jose import jwt, JWTError
 from passlib.context import CryptContext
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 import uuid
@@ -52,8 +52,13 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = De
     except JWTError:
         raise credentials_exception
     
-    # Get user from database
-    user = db.query(User).filter(User.id == token_data.user_id).first()
+    # Get user from database with subscription eager-loaded
+    user = (
+        db.query(User)
+        .options(joinedload(User.subscription))
+        .filter(User.id == token_data.user_id)
+        .first()
+    )
     if user is None:
         raise credentials_exception
     
