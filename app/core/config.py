@@ -76,6 +76,16 @@ class Settings(BaseSettings):
     LLM_REGULAR: str = "gpt-3.5-turbo"
     LLM_DEFAULT_EXECUTION: str = "gpt-3.5-turbo"
     
+    # Stripe Billing Settings
+    STRIPE_SECRET_KEY: str | None = None
+    STRIPE_WEBHOOK_SECRET: str | None = None
+    STRIPE_PRICE_BASIC: str | None = None
+    STRIPE_PRICE_PRO: str | None = None
+    STRIPE_PRICE_BASIC_YEARLY: str | None = None
+    STRIPE_PRICE_PRO_YEARLY: str | None = None
+    STRIPE_SUCCESS_URL: str | None = None
+    STRIPE_CANCEL_URL: str | None = None
+    
     # Document Processing Settings
     UPLOAD_DIR: str = "./uploads"
     DOCUMENT_CHUNKS_DIR: str = "./document_chunks"

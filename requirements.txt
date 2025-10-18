@@ -21,6 +21,7 @@ httpx==0.28.1
 requests==2.32.5
 aiohttp==3.10.11
 openai==2.2.0
+stripe==10.9.0
 
 # Cloud storage dependencies
 google-cloud-storage==2.15.0
