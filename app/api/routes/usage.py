@@ -15,8 +15,13 @@ async def get_remaining_usage(
     current_user: User = Depends(get_current_user)
 ):
     try:
-        plan = (current_user.subscription.plan if current_user.subscription else SubscriptionPlan.FREE)
-        limits = PLAN_LIMITS.get(plan.value, PLAN_LIMITS["free"])  # default to free
+        raw_plan = (current_user.subscription.plan if current_user.subscription else SubscriptionPlan.FREE)
+        # Accept both enum and string values safely
+        if isinstance(raw_plan, SubscriptionPlan):
+            plan_key = raw_plan.value
+        else:
+            plan_key = str(raw_plan).lower()
+        limits = PLAN_LIMITS.get(plan_key, PLAN_LIMITS["free"])  # default to free
 
         usage = _ensure_usage_row(db, current_user.id)
 
@@ -32,7 +37,7 @@ async def get_remaining_usage(
         db.add(usage)
         db.commit()
 
-        if plan == SubscriptionPlan.FREE:
+        if plan_key == SubscriptionPlan.FREE.value or plan_key == "free":
             window = "day"
             cap = limits.get("day_limit", 0)
             plan_used = usage.day_tokens_used or 0
@@ -45,7 +50,7 @@ async def get_remaining_usage(
         bonus_remaining = usage.bonus_tokens_remaining or 0
 
         return {
-            "plan": plan.value,
+            "plan": plan_key,
             "window": window,
             "plan_cap": cap,
             "plan_used": plan_used,
