@@ -83,6 +83,8 @@ class Settings(BaseSettings):
     STRIPE_PRICE_PRO: str | None = None
     STRIPE_PRICE_BASIC_YEARLY: str | None = None
     STRIPE_PRICE_PRO_YEARLY: str | None = None
+    STRIPE_PRICE_TOPUP_50K: str | None = None
+    STRIPE_PRICE_TOPUP_200K: str | None = None
     STRIPE_SUCCESS_URL: str | None = None
     STRIPE_CANCEL_URL: str | None = None
     
