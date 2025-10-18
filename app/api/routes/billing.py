@@ -85,6 +85,71 @@ def create_checkout_session(payload: Dict[str, Any], db: Session = Depends(get_d
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.post("/billing/create-topup-session")
+def create_topup_session(payload: Dict[str, Any], db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    """Create a Stripe Checkout session for a one-time token top-up purchase.
+    Body expects either {"pack": "50k"|"200k"} or {"tokens": <int>}.
+    """
+    secret_key = _require_env("STRIPE_SECRET_KEY")
+    success_url = _require_env("STRIPE_SUCCESS_URL")
+    cancel_url = _require_env("STRIPE_CANCEL_URL")
+
+    # Map packs to price IDs (env)
+    pack = payload.get("pack")
+    tokens = payload.get("tokens")
+
+    # Price IDs from env
+    price_50k = getattr(settings, "STRIPE_PRICE_TOPUP_50K", None)
+    price_200k = getattr(settings, "STRIPE_PRICE_TOPUP_200K", None)
+
+    if pack == "50k":
+        price_id = price_50k
+        pack_tokens = 50_000
+    elif pack == "200k":
+        price_id = price_200k
+        pack_tokens = 200_000
+    elif tokens and isinstance(tokens, int) and tokens > 0:
+        # For custom tokens, require a price ID in payload (advanced usage)
+        price_id = payload.get("price_id")
+        pack_tokens = tokens
+    else:
+        raise HTTPException(status_code=422, detail="Invalid top-up request")
+
+    if not price_id:
+        raise HTTPException(status_code=500, detail="Top-up price not configured")
+
+    stripe.api_key = secret_key
+    try:
+        # Ensure a customer exists
+        customer_id = None
+        if current_user.subscription and current_user.subscription.stripe_customer_id:
+            customer_id = current_user.subscription.stripe_customer_id
+        else:
+            customer = stripe.Customer.create(
+                email=current_user.email,
+                name=current_user.name,
+                metadata={"user_id": current_user.id}
+            )
+            customer_id = customer.id
+
+        session = stripe.checkout.Session.create(
+            mode="payment",
+            customer=customer_id,
+            line_items=[{"price": price_id, "quantity": 1}],
+            success_url=success_url + "?session_id={CHECKOUT_SESSION_ID}",
+            cancel_url=cancel_url,
+            metadata={
+                "user_id": current_user.id,
+                "type": "topup",
+                "tokens": str(pack_tokens),
+            }
+        )
+        return {"url": session.url, "id": session.id}
+    except Exception as e:
+        logger.exception("Failed to create topup session")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.post("/billing/webhook")
 async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
     """Handle Stripe webhooks to keep subscription state in sync."""
@@ -136,6 +201,32 @@ async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
                 stripe_subscription_id=subscription_id,
             )
             return {"status": "ok"}
+
+        # Handle top-up sessions (one-time payments)
+        if event_type == "checkout.session.completed":
+            session_obj = data  # initial collapsed session
+            # Expand if needed
+            if not session_obj.get("metadata"):
+                stripe.api_key = _require_env("STRIPE_SECRET_KEY")
+                session_obj = stripe.checkout.Session.retrieve(data.get("id"), expand=["payment_intent"])  # type: ignore
+            meta = session_obj.get("metadata", {})
+            if meta.get("type") == "topup":
+                user_id = meta.get("user_id")
+                tokens_str = meta.get("tokens", "0")
+                try:
+                    tokens_to_add = int(tokens_str)
+                except Exception:
+                    tokens_to_add = 0
+                if tokens_to_add > 0 and user_id:
+                    # Increment bonus_tokens_remaining
+                    from sqlalchemy import text
+                    db.execute(text("""
+                        INSERT INTO user_usage (user_id, day_tokens_used, day_anchor, month_tokens_used, month_anchor, bonus_tokens_remaining)
+                        VALUES (:uid, 0, CURRENT_DATE, 0, date_trunc('month', NOW())::date, :tokens)
+                        ON CONFLICT (user_id) DO UPDATE SET bonus_tokens_remaining = user_usage.bonus_tokens_remaining + :tokens
+                    """), {"uid": user_id, "tokens": tokens_to_add})
+                    db.commit()
+                return {"status": "ok"}
 
         elif event_type in ("customer.subscription.updated", "customer.subscription.created"):
             subscription = data

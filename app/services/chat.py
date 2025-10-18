@@ -12,6 +12,7 @@ from app.models.chat import Conversation, Message, MessageRole
 from app.models.user import User
 from app.services.token_usage import record_token_usage
 from app.services.ai import get_ai_response, moderate_content
+from app.services.usage import before_llm_check, after_llm_update
 
 
 def create_conversation(
@@ -403,13 +404,24 @@ async def process_chat_message(
         for msg in conversation_messages[-20:]
     ]
     
-    # Get AI response
+    # Get AI response with quota enforcement
     try:
+        # Pre-call quota check and clamp
+        clamped_out, est_total, plan_remaining, usage_row = before_llm_check(
+            db=db,
+            user=user,
+            planned_out=max_tokens,
+            prompt="\n".join([m["content"] for m in formatted_messages])
+        )
+
+        if est_total > (plan_remaining + (usage_row.bonus_tokens_remaining or 0)):
+            raise HTTPException(status_code=status.HTTP_402_PAYMENT_REQUIRED, detail="Token limit reached")
+
         ai_response, usage = await get_ai_response(
             formatted_messages,
             model=model,
             temperature=temperature,
-            max_tokens=max_tokens
+            max_tokens=clamped_out
         )
         
         # Record token usage
@@ -425,6 +437,15 @@ async def process_chat_message(
         )
         
         record_token_usage(db, user.id, token_usage)
+
+        # After-call accounting with actual token usage
+        try:
+            actual_in = usage.get("prompt_tokens", 0)
+            actual_out = usage.get("completion_tokens", 0)
+            after_llm_update(db, user, usage_row, actual_in, actual_out)
+        except Exception:
+            # Do not fail the response if accounting fails
+            pass
         
         # Create assistant message
         assistant_message = create_message(
