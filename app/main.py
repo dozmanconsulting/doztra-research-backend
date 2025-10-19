@@ -9,7 +9,7 @@ from fastapi.templating import Jinja2Templates
 from fastapi.exceptions import RequestValidationError
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials, APIKeyHeader
 from datetime import datetime
 import json
 import logging
@@ -214,7 +214,20 @@ optional_security = OptionalHTTPBearer(auto_error=False)
 # Helper function to check admin authorization is imported from admin service
 
 # OpenAPI schema endpoint - public for Swagger UI to work
-@app.get("/api/openapi.json", include_in_schema=False)
+admin_docs_key_header = APIKeyHeader(name="X-Admin-Docs-Key", auto_error=False)
+
+async def docs_guard(x_admin_docs_key: Optional[str] = Depends(admin_docs_key_header)):
+    expected = os.getenv("ADMIN_DOCS_KEY")
+    # If no key is configured, deny to avoid accidental exposure
+    if not expected:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
+    if x_admin_docs_key != expected:
+        # Return 404 to not reveal existence
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
+
+
+# OpenAPI schema endpoint - protected
+@app.get("/api/openapi.json", include_in_schema=False, dependencies=[Depends(docs_guard)])
 async def get_openapi_endpoint():
     try:
         schema = app.openapi()
@@ -226,8 +239,8 @@ async def get_openapi_endpoint():
             status_code=500
         )
 
-# Custom Swagger UI route - GET method (public access)
-@app.get("/docs", include_in_schema=False)
+# Custom Swagger UI route - protected
+@app.get("/docs", include_in_schema=False, dependencies=[Depends(docs_guard)])
 async def custom_swagger_ui_html_get(request: Request):
     return get_swagger_ui_html(
         openapi_url="/api/openapi.json",
@@ -301,8 +314,8 @@ async def handle_docs_request(request: Request, credentials: Optional[HTTPAuthor
             status_code=status.HTTP_303_SEE_OTHER
         )
 
-# Custom ReDoc route (admin only) - GET method
-@app.get("/redoc", include_in_schema=False)
+# Custom ReDoc route (admin only) - protected
+@app.get("/redoc", include_in_schema=False, dependencies=[Depends(docs_guard)])
 async def redoc_html_get(request: Request):
     return get_redoc_html(
         openapi_url="/api/openapi.json",
