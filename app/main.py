@@ -402,6 +402,56 @@ def generate_swagger_ui_html(token=None):
     modified_content = swagger_ui_content.replace("</body>", f"{token_script}</body>")
     return HTMLResponse(content=modified_content)
 
+# Public helper page to view docs by injecting X-Admin-Docs-Key
+@app.get("/admin-docs", include_in_schema=False)
+async def admin_docs_page():
+    """
+    Public HTML that renders Swagger UI and injects the header X-Admin-Docs-Key
+    from sessionStorage or the `?key=` query parameter, so it can call the
+    protected /api/openapi.json endpoint.
+    """
+    ui = get_swagger_ui_html(
+        openapi_url="/api/openapi.json",
+        title=f"{app.title} - Admin Docs",
+        oauth2_redirect_url=app.swagger_ui_oauth2_redirect_url,
+        swagger_js_url="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5.9.0/swagger-ui-bundle.js",
+        swagger_css_url="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5.9.0/swagger-ui.css",
+        swagger_favicon_url="/static/favicon.ico",
+    )
+    html = ui.body.decode()
+    inject = """
+    <script>
+    (function() {
+      try {
+        const params = new URLSearchParams(window.location.search);
+        const qKey = params.get('key');
+        if (qKey) {
+          sessionStorage.setItem('admin_docs_key', qKey);
+          // remove the key from URL
+          const cleanUrl = window.location.origin + window.location.pathname;
+          window.history.replaceState({}, document.title, cleanUrl);
+        }
+        const key = sessionStorage.getItem('admin_docs_key');
+        if (key) {
+          const originalFetch = window.fetch;
+          window.fetch = function(url, options) {
+            options = options || {};
+            options.headers = options.headers || {};
+            try {
+              const u = typeof url === 'string' ? url : (url && url.url) || '';
+              if (u.includes('/api/openapi.json') || u.startsWith('/api/')) {
+                options.headers['X-Admin-Docs-Key'] = key;
+              }
+            } catch (e) {}
+            return originalFetch(url, options);
+          };
+        }
+      } catch (e) { console.error('Docs key injection failed', e); }
+    })();
+    </script>
+    """
+    return HTMLResponse(content=html.replace("</body>", inject + "</body>"))
+
 # API landing page (public)
 @app.get("/", include_in_schema=False)
 async def root():
