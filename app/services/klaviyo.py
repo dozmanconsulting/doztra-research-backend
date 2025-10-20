@@ -6,7 +6,7 @@ from app.core.config import settings
 
 KLAVIYO_EVENTS_URL = "https://a.klaviyo.com/api/events/"
 KLAVIYO_REVISION = "2024-06-15"  # Klaviyo API revision date
-KLAVIYO_LIST_SUBSCRIBE_URL_TMPL = "https://a.klaviyo.com/api/v2/list/{list_id}/members"
+KLAVIYO_LIST_SUBSCRIBE_URL_TMPL = "https://a.klaviyo.com/api/lists/{list_id}/relationships/profiles"
 
 
 async def send_user_signed_up_event(email: str, first_name: Optional[str] = None, plan: Optional[str] = None) -> None:
@@ -67,21 +67,29 @@ async def subscribe_user_to_list(email: str, first_name: Optional[str] = None) -
         return
 
     url = KLAVIYO_LIST_SUBSCRIBE_URL_TMPL.format(list_id=settings.KLAVIYO_LIST_ID)
+    headers = {
+        "Authorization": f"Klaviyo-API-Key {settings.KLAVIYO_API_KEY}",
+        "revision": KLAVIYO_REVISION,
+        "Content-Type": "application/json",
+    }
     payload = {
-        "api_key": settings.KLAVIYO_API_KEY,
-        "profiles": [
+        "data": [
             {
-                "email": email,
-                **({"first_name": first_name} if first_name else {}),
+                "type": "profile",
+                "attributes": {
+                    "email": email,
+                    **({"first_name": first_name} if first_name else {}),
+                },
             }
-        ],
+        ]
     }
 
     try:
         async with httpx.AsyncClient(timeout=10) as client:
-            resp = await client.post(url, json=payload, headers={"Content-Type": "application/json"})
-            resp.raise_for_status()
+            resp = await client.post(url, json=payload, headers=headers)
+            # 204 No Content or 200 indicates success in some revisions; accept 2xx
+            if resp.status_code // 100 != 2:
+                resp.raise_for_status()
     except Exception:
-        # Never break signup if list subscribe fails
         pass
 
