@@ -7,6 +7,7 @@ from app.core.config import settings
 KLAVIYO_EVENTS_URL = "https://a.klaviyo.com/api/events/"
 KLAVIYO_REVISION = "2024-06-15"  # Klaviyo API revision date
 KLAVIYO_LIST_SUBSCRIBE_URL_TMPL = "https://a.klaviyo.com/api/lists/{list_id}/relationships/profiles"
+KLAVIYO_PROFILES_URL = "https://a.klaviyo.com/api/profiles/"
 
 
 async def send_user_signed_up_event(email: str, first_name: Optional[str] = None, plan: Optional[str] = None) -> None:
@@ -66,30 +67,49 @@ async def subscribe_user_to_list(email: str, first_name: Optional[str] = None) -
     if not settings.KLAVIYO_API_KEY or not settings.KLAVIYO_LIST_ID:
         return
 
-    url = KLAVIYO_LIST_SUBSCRIBE_URL_TMPL.format(list_id=settings.KLAVIYO_LIST_ID)
     headers = {
         "Authorization": f"Klaviyo-API-Key {settings.KLAVIYO_API_KEY}",
         "revision": KLAVIYO_REVISION,
         "Content-Type": "application/json",
     }
-    payload = {
-        "data": [
-            {
+
+    profile_id: Optional[str] = None
+    try:
+        # Upsert profile to get an ID
+        profile_payload = {
+            "data": {
                 "type": "profile",
                 "attributes": {
                     "email": email,
                     **({"first_name": first_name} if first_name else {}),
                 },
             }
-        ]
-    }
+        }
+        async with httpx.AsyncClient(timeout=10) as client:
+            pr = await client.post(KLAVIYO_PROFILES_URL, json=profile_payload, headers=headers)
+            if pr.status_code // 100 == 2:
+                body = pr.json()
+                profile_id = body.get("data", {}).get("id")
+    except Exception:
+        profile_id = None
+
+    if not profile_id:
+        # Cannot proceed to add relationship without a profile id
+        return
 
     try:
+        # Add profile to list by id
+        list_url = KLAVIYO_LIST_SUBSCRIBE_URL_TMPL.format(list_id=settings.KLAVIYO_LIST_ID)
+        rel_payload = {
+            "data": [
+                {"type": "profile", "id": profile_id}
+            ]
+        }
         async with httpx.AsyncClient(timeout=10) as client:
-            resp = await client.post(url, json=payload, headers=headers)
-            # 204 No Content or 200 indicates success in some revisions; accept 2xx
-            if resp.status_code // 100 != 2:
-                resp.raise_for_status()
+            lr = await client.post(list_url, json=rel_payload, headers=headers)
+            # Accept any 2xx as success
+            if lr.status_code // 100 != 2:
+                lr.raise_for_status()
     except Exception:
         pass
 
