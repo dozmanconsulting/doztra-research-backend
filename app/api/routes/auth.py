@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Body
+from fastapi import APIRouter, Depends, HTTPException, status, Body, BackgroundTasks
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
@@ -39,6 +39,7 @@ from app.services.auth import (
 from app.utils.email import send_welcome_email, send_verification_email, send_password_reset_email
 from app.utils.security import generate_verification_token, verify_verification_token, generate_password_reset_token, verify_password_reset_token
 from app.utils.uuid_helper import convert_uuid_to_str
+from app.services.klaviyo import send_user_signed_up_event
 
 router = APIRouter()
 
@@ -85,7 +86,8 @@ def debug_auth(request: dict = Body(...), db: Session = Depends(get_db)):
 @router.post("/register", response_model=UserWithToken, status_code=status.HTTP_201_CREATED)
 def register(
     user_in: UserCreate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    background: BackgroundTasks = None
 ) -> Any:
     """
     Register a new user with optional subscription information.
@@ -116,6 +118,23 @@ def register(
     
     # Send welcome email
     send_welcome_email(user.email, user.name)
+
+    # Fire Klaviyo signup event in the background (non-blocking)
+    try:
+        if background is not None:
+            plan_value = None
+            try:
+                plan_value = (
+                    user.subscription.plan.value
+                    if hasattr(user, "subscription") and user.subscription and hasattr(user.subscription.plan, "value")
+                    else (user.subscription.plan if hasattr(user, "subscription") and user.subscription else None)
+                )
+            except Exception:
+                plan_value = None
+            background.add_task(send_user_signed_up_event, email=user.email, first_name=user.name, plan=plan_value)
+    except Exception:
+        # Never break signup if analytics fails
+        pass
     
     # Create a clean dictionary for the response
     user_data = {

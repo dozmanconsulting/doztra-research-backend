@@ -39,7 +39,7 @@ class Settings(BaseSettings):
     SMTP_HOST: str = "smtp.gmail.com"
     SMTP_USER: str = ""
     SMTP_PASSWORD: str = ""
-    EMAILS_FROM_EMAIL: str = "noreply@doztra.ai"
+    EMAILS_FROM_EMAIL: str = "info@doztra.ai"
     EMAILS_FROM_NAME: str = "Doztra AI"
     
     # Password reset
@@ -111,6 +111,10 @@ class Settings(BaseSettings):
     PARALLEL_EMBEDDING_GENERATION: bool = True
     MAX_PARALLEL_EMBEDDINGS: int = 5
     OPTIMIZE_CHUNK_SIZE: bool = True
+
+    # Klaviyo
+    KLAVIYO_API_KEY: Optional[str] = None
+    KLAVIYO_EVENT_SIGNUP: str = "user_signed_up"
     
     class Config:
         case_sensitive = True
