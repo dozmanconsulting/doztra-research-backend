@@ -115,6 +115,7 @@ class Settings(BaseSettings):
     # Klaviyo
     KLAVIYO_API_KEY: Optional[str] = None
     KLAVIYO_EVENT_SIGNUP: str = "user_signed_up"
+    KLAVIYO_LIST_ID: Optional[str] = None
     
     class Config:
         case_sensitive = True

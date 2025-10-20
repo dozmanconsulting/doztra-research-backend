@@ -39,7 +39,7 @@ from app.services.auth import (
 from app.utils.email import send_welcome_email, send_verification_email, send_password_reset_email
 from app.utils.security import generate_verification_token, verify_verification_token, generate_password_reset_token, verify_password_reset_token
 from app.utils.uuid_helper import convert_uuid_to_str
-from app.services.klaviyo import send_user_signed_up_event
+from app.services.klaviyo import send_user_signed_up_event, subscribe_user_to_list
 
 router = APIRouter()
 
@@ -137,6 +137,8 @@ def register(
     # Fire Klaviyo signup event in the background (non-blocking)
     try:
         if background is not None:
+            # Subscribe user to Klaviyo list if configured
+            background.add_task(subscribe_user_to_list, email=user.email, first_name=user.name)
             plan_value = None
             try:
                 plan_value = (
