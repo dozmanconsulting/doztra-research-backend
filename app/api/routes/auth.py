@@ -116,8 +116,13 @@ def register(
     verification_token = generate_verification_token(user.email)
     send_verification_email(user.email, verification_token)
     
-    # Send welcome email
-    send_welcome_email(user.email, user.name)
+    # Send internal welcome email only if Klaviyo is not configured
+    try:
+        if not settings.KLAVIYO_API_KEY:
+            send_welcome_email(user.email, user.name)
+    except Exception:
+        # Never break signup if email sending fails
+        pass
 
     # Fire Klaviyo signup event in the background (non-blocking)
     try:
