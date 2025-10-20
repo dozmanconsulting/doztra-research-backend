@@ -90,6 +90,17 @@ async def subscribe_user_to_list(email: str, first_name: Optional[str] = None) -
             if pr.status_code // 100 == 2:
                 body = pr.json()
                 profile_id = body.get("data", {}).get("id")
+            elif pr.status_code == 409:
+                # Profile exists; fetch by email to get ID
+                # Note: email must be quoted inside equals(). We URL-encode the filter value.
+                filter_q = f'equals(email,"{email}")'
+                params = {"filter": filter_q}
+                gr = await client.get(KLAVIYO_PROFILES_URL, headers=headers, params=params)
+                if gr.status_code // 100 == 2:
+                    gbody = gr.json()
+                    data = gbody.get("data", [])
+                    if isinstance(data, list) and data:
+                        profile_id = data[0].get("id")
     except Exception:
         profile_id = None
 
@@ -107,8 +118,8 @@ async def subscribe_user_to_list(email: str, first_name: Optional[str] = None) -
         }
         async with httpx.AsyncClient(timeout=10) as client:
             lr = await client.post(list_url, json=rel_payload, headers=headers)
-            # Accept any 2xx as success
-            if lr.status_code // 100 != 2:
+            # Accept any 2xx as success, and 409 means already related (also fine)
+            if not (200 <= lr.status_code < 300 or lr.status_code == 409):
                 lr.raise_for_status()
     except Exception:
         pass
