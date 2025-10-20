@@ -26,7 +26,7 @@ from app.schemas.email import (
 from app.schemas.message import Message
 
 # Service imports
-from app.services.user import get_user_by_email, create_user, authenticate_user
+from app.services.user import get_user_by_email, create_user, authenticate_user, verify_user_email
 from app.services.auth import (
     create_access_token,
     create_refresh_token,
@@ -112,9 +112,19 @@ def register(
     # Create refresh token
     refresh_token_value = create_refresh_token(db, user.id)
     
-    # Generate verification token and send email
-    verification_token = generate_verification_token(user.email)
-    send_verification_email(user.email, verification_token)
+    # Email verification handling (A1): if Klaviyo is configured, auto-verify and skip SMTP
+    if settings.KLAVIYO_API_KEY:
+        try:
+            verify_user_email(db, user)
+        except Exception:
+            pass
+    else:
+        # Generate verification token and send email via SMTP
+        verification_token = generate_verification_token(user.email)
+        try:
+            send_verification_email(user.email, verification_token)
+        except Exception:
+            pass
     
     # Send internal welcome email only if Klaviyo is not configured
     try:
