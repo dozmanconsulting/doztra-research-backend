@@ -134,12 +134,30 @@ def get_token_usage_history(
     # Apply pagination
     records = query.order_by(TokenUsage.date.desc()).offset((page - 1) * limit).limit(limit).all()
     
+    # Serialize to response schema shape with strings for id and request_type
+    def _req_type_to_str(rt):
+        try:
+            return str(rt.value)
+        except Exception:
+            return str(rt)
+    
+    history_out = [{
+        "id": str(r.id),
+        "date": r.date,
+        "request_type": _req_type_to_str(r.request_type),
+        "model": r.model,
+        "prompt_tokens": r.prompt_tokens,
+        "completion_tokens": r.completion_tokens,
+        "total_tokens": r.total_tokens,
+        "request_id": r.request_id
+    } for r in records]
+    
     return {
         "total_records": total_records,
         "total_pages": total_pages,
         "current_page": page,
         "records_per_page": limit,
-        "history": records
+        "history": history_out
     }
 
 
