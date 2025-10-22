@@ -11,6 +11,7 @@ class TokenUsageBase(BaseModel):
     completion_tokens: int
     total_tokens: int
     request_id: Optional[str] = None
+    conversation_id: Optional[str] = None
 
 
 class TokenUsageCreate(TokenUsageBase):
@@ -98,3 +99,4 @@ class TokenUsageTrack(BaseModel):
     completion_tokens: int = 0
     total_tokens: int
     request_id: Optional[str] = None
+    conversation_id: Optional[str] = None

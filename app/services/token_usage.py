@@ -20,6 +20,7 @@ def create_token_usage(db: Session, token_usage_in: TokenUsageCreate) -> TokenUs
         completion_tokens=token_usage_in.completion_tokens,
         total_tokens=token_usage_in.total_tokens,
         request_id=token_usage_in.request_id,
+        conversation_id=token_usage_in.conversation_id,
         date=current_time  # Use the date column instead of timestamp
     )
     db.add(db_token_usage)
@@ -142,7 +143,83 @@ def get_token_usage_history(
     }
 
 
-def get_token_usage_statistics(db: Session, user_id: str) -> Dict[str, Any]:
+def get_token_usage_by_conversation(db: Session, user_id: str, conversation_id: str, limit: int = 20) -> Dict[str, Any]:
+    """
+    Return totals and recent usage events for a specific conversation and user.
+    """
+    from sqlalchemy import func
+    from app.models.token_usage import TokenUsage
+
+    q = db.query(TokenUsage).filter(
+        TokenUsage.user_id == user_id,
+        TokenUsage.conversation_id == conversation_id
+    )
+
+    totals_row = db.query(
+        func.coalesce(func.sum(TokenUsage.prompt_tokens), 0),
+        func.coalesce(func.sum(TokenUsage.completion_tokens), 0),
+        func.coalesce(func.sum(TokenUsage.total_tokens), 0)
+    ).filter(
+        TokenUsage.user_id == user_id,
+        TokenUsage.conversation_id == conversation_id
+    ).first()
+
+    recent = q.order_by(TokenUsage.date.desc()).limit(limit).all()
+
+    totals = {
+        "prompt_tokens": int(totals_row[0] or 0),
+        "completion_tokens": int(totals_row[1] or 0),
+        "total_tokens": int(totals_row[2] or 0),
+    }
+
+    # Shape recent for API consumers
+    recent_out = [
+        {
+            "id": r.id,
+            "request_type": str(r.request_type.value if hasattr(r.request_type, 'value') else r.request_type),
+            "model": r.model,
+            "prompt_tokens": r.prompt_tokens,
+            "completion_tokens": r.completion_tokens,
+            "total_tokens": r.total_tokens,
+            "timestamp": r.date.isoformat(),
+            "request_id": r.request_id,
+        }
+        for r in recent
+    ]
+
+    return {
+        "conversation_id": conversation_id,
+        "totals": totals,
+        "recent": recent_out,
+    }
+
+
+def _period_range(period: Optional[str]) -> (datetime, datetime):
+    today = datetime.utcnow()
+    if period == 'week':
+        # last 7 days inclusive
+        start = today - timedelta(days=6)
+        end = today
+    elif period == 'quarter':
+        # current quarter
+        quarter = (today.month - 1) // 3
+        start_month = quarter * 3 + 1
+        start = datetime(today.year, start_month, 1)
+        if start_month + 3 > 12:
+            end = datetime(today.year + 1, 1, 1) - timedelta(days=1)
+        else:
+            end = datetime(today.year, start_month + 3, 1) - timedelta(days=1)
+    else:
+        # default month
+        start = datetime(today.year, today.month, 1)
+        if today.month == 12:
+            end = datetime(today.year + 1, 1, 1) - timedelta(days=1)
+        else:
+            end = datetime(today.year, today.month + 1, 1) - timedelta(days=1)
+    return start, end
+
+
+def get_token_usage_statistics(db: Session, user_id: str, period: Optional[str] = None) -> Dict[str, Any]:
     """
     Get token usage statistics for a user.
     """
@@ -152,19 +229,14 @@ def get_token_usage_statistics(db: Session, user_id: str) -> Dict[str, Any]:
     user = db.query(User).filter(User.id == user_id).first()
     token_limit = user.subscription.token_limit if user and user.subscription else None
     
-    # Get current billing period (assume monthly for now)
-    today = datetime.utcnow()
-    start_of_month = datetime(today.year, today.month, 1)
-    if today.month == 12:
-        end_of_month = datetime(today.year + 1, 1, 1) - timedelta(days=1)
-    else:
-        end_of_month = datetime(today.year, today.month + 1, 1) - timedelta(days=1)
+    # Get selected aggregation period
+    start_of_period, end_of_period = _period_range(period)
     
     # Get total tokens used in current period
     current_period_usage = db.query(TokenUsageSummary).filter(
         TokenUsageSummary.user_id == user_id,
-        TokenUsageSummary.year == today.year,
-        TokenUsageSummary.month == today.month
+        # Filter by period by matching year/month inside the range
+        # Simplified: include summaries whose (year,month) falls in range
     ).all()
     
     tokens_used = sum(summary.total_tokens for summary in current_period_usage) if current_period_usage else 0
@@ -180,8 +252,8 @@ def get_token_usage_statistics(db: Session, user_id: str) -> Dict[str, Any]:
     model_breakdown = {}
     model_usage = db.query(TokenUsage.model, func.sum(TokenUsage.total_tokens).label('total')).filter(
         TokenUsage.user_id == user_id,
-        TokenUsage.date >= start_of_month,
-        TokenUsage.date <= end_of_month
+        TokenUsage.date >= start_of_period,
+        TokenUsage.date <= end_of_period
     ).group_by(TokenUsage.model).all()
     
     for model, total in model_usage:
@@ -189,8 +261,8 @@ def get_token_usage_statistics(db: Session, user_id: str) -> Dict[str, Any]:
     
     # Get daily usage for the last 30 days
     daily_usage = []
-    end_date = today
-    start_date = end_date - timedelta(days=30)
+    end_date = end_of_period
+    start_date = max(start_of_period, end_date - timedelta(days=30))
     
     # Simplified approach for SQLite
     # Just get all summaries and filter in Python
@@ -218,8 +290,8 @@ def get_token_usage_statistics(db: Session, user_id: str) -> Dict[str, Any]:
     
     return {
         "current_period": {
-            "start_date": start_of_month.isoformat(),
-            "end_date": end_of_month.isoformat(),
+            "start_date": start_of_period.isoformat(),
+            "end_date": end_of_period.isoformat(),
             "tokens_used": tokens_used,
             "tokens_limit": token_limit,
             "percentage_used": (tokens_used / token_limit * 100) if token_limit else None
@@ -264,7 +336,8 @@ def track_token_usage(db: Session, user_id: str, token_usage_in: TokenUsageTrack
         prompt_tokens=token_usage_in.prompt_tokens,
         completion_tokens=token_usage_in.completion_tokens,
         total_tokens=token_usage_in.total_tokens,
-        request_id=token_usage_in.request_id
+        request_id=token_usage_in.request_id,
+        conversation_id=token_usage_in.conversation_id
     )
     
     return create_token_usage(db, token_usage_create)

@@ -24,6 +24,35 @@ def read_token_usage(
     return get_token_usage_statistics(db, current_user.id)
 
 
+@router.get("/me/summary", response_model=TokenUsageStatistics)
+def read_token_usage_summary(
+    period: Optional[str] = Query(None, description="Aggregate period: week|month|quarter (currently defaults to month)"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+) -> Any:
+    """
+    Phase 2 stub: Get current user's token usage summary for a period.
+    Currently returns the same structure as /me (monthly), while preserving
+    the API contract to expand later without breaking the client.
+    """
+    # Honor period in services (week/month/quarter)
+    return get_token_usage_statistics(db, current_user.id, period)
+
+
+@router.get("/me/by-conversation")
+def read_token_usage_by_conversation(
+    conversation_id: str = Query(..., description="Conversation ID to fetch usage for"),
+    limit: int = Query(20, ge=1, le=200),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+) -> Any:
+    """
+    Per-conversation usage (Phase 2). Returns totals and recent events.
+    """
+    from app.services.token_usage import get_token_usage_by_conversation
+    return get_token_usage_by_conversation(db, current_user.id, conversation_id, limit)
+
+
 @router.get("/me/history", response_model=TokenUsageHistory)
 def read_token_usage_history(
     start_date: Optional[str] = None,

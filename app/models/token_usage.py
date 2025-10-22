@@ -23,6 +23,7 @@ class TokenUsage(Base):
     completion_tokens = Column(Integer, default=0, nullable=False)
     total_tokens = Column(Integer, default=0, nullable=False)
     request_id = Column(String, nullable=True)
+    conversation_id = Column(String, nullable=True)
     date = Column(DateTime, default=datetime.utcnow)
     
     # Relationships
