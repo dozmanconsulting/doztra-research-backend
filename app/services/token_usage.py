@@ -237,6 +237,67 @@ def _period_range(period: Optional[str]) -> (datetime, datetime):
     return start, end
 
 
+def _end_of_day(dt: datetime) -> datetime:
+    return datetime(dt.year, dt.month, dt.day, 23, 59, 59)
+
+
+def get_remaining_tokens(db: Session, user_id: str, period: Optional[str] = 'month') -> Dict[str, Any]:
+    """
+    Compute remaining tokens for the current period based on subscription token_limit.
+    Token packs not yet implemented; pack_balance assumed 0.
+    """
+    start_of_period, end_of_period = _period_range(period)
+    user = db.query(User).filter(User.id == user_id).first()
+    token_limit = user.subscription.token_limit if user and user.subscription else 0
+
+    # Sum usage in period
+    summaries = db.query(TokenUsageSummary).filter(TokenUsageSummary.user_id == user_id).all()
+    tokens_used = 0
+    if summaries:
+        for summary in summaries:
+            date_str = f"{summary.year:04d}-{summary.month:02d}-{summary.day:02d}"
+            date_obj = datetime.strptime(date_str, "%Y-%m-%d")
+            if start_of_period.date() <= date_obj.date() <= end_of_period.date():
+                tokens_used += summary.total_tokens
+
+    remaining = max(0, (token_limit or 0) - tokens_used)
+    percent_used = (tokens_used / token_limit * 100) if token_limit else None
+
+    threshold = None
+    if percent_used is not None:
+        if percent_used >= 100:
+            threshold = '100'
+        elif percent_used >= 95:
+            threshold = '95'
+        elif percent_used >= 80:
+            threshold = '80'
+
+    return {
+        'limit': token_limit or 0,
+        'used': tokens_used,
+        'remaining': remaining,
+        'percent_used': percent_used,
+        'next_reset_at': _end_of_day(end_of_period).isoformat(),
+        'threshold': threshold,
+        'pack_balance': 0,
+    }
+
+
+def require_tokens(db: Session, user_id: str, estimated_tokens: int, period: Optional[str] = 'month') -> None:
+    stats = get_remaining_tokens(db, user_id, period)
+    if stats['limit'] and stats['remaining'] < max(1, estimated_tokens):
+        raise HTTPException(
+            status_code=402,
+            detail={
+                'code': 'TOKEN_EXHAUSTED',
+                'message': 'Your token quota is exhausted. Buy a token pack or wait for the monthly reset.',
+                'remaining': stats['remaining'],
+                'needed': estimated_tokens,
+                'next_reset_at': stats['next_reset_at'],
+                'can_buy_pack': True,
+            }
+        )
+
 def get_token_usage_statistics(db: Session, user_id: str, period: Optional[str] = None) -> Dict[str, Any]:
     """
     Get token usage statistics for a user.
@@ -306,13 +367,18 @@ def get_token_usage_statistics(db: Session, user_id: str, period: Optional[str] 
     # Sort daily usage by date
     daily_usage.sort(key=lambda x: x["date"])
     
+    remaining_stats = get_remaining_tokens(db, user_id, period or 'month')
+
     return {
         "current_period": {
             "start_date": start_of_period.isoformat(),
             "end_date": end_of_period.isoformat(),
             "tokens_used": tokens_used,
             "tokens_limit": token_limit,
-            "percentage_used": (tokens_used / token_limit * 100) if token_limit else None
+            "percentage_used": (tokens_used / token_limit * 100) if token_limit else None,
+            "remaining": remaining_stats['remaining'],
+            "next_reset_at": remaining_stats['next_reset_at'],
+            "threshold": remaining_stats['threshold'],
         },
         "breakdown": {
             "chat": {

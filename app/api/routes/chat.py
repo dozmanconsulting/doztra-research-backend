@@ -37,6 +37,7 @@ from app.schemas.chat import (
     MessageResponse,
     ConversationCreate
 )
+from app.services.token_usage import require_tokens
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
@@ -86,6 +87,8 @@ async def send_message(
     """
     try:
         from app.utils.uuid_helper import convert_uuid_to_str
+        
+        require_tokens(db, current_user.id, estimated_tokens=request.max_tokens or 500)
         
         response = await process_chat_message(
             db,

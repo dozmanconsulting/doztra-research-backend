@@ -12,8 +12,11 @@ import json
 import logging
 
 from app.api.deps import get_current_active_user
+from app.db.session import get_db
+from sqlalchemy.orm import Session
 from app.models.user import User
 from app.services import openai_service
+from app.services.token_usage import require_tokens
 from app.core.config import settings
 
 # Set up logging
@@ -369,6 +372,7 @@ def generate_template_prompt(prompt_type: str, topic: str, additional_context: s
 @router.post("/generate", response_model=PromptGenerationResponse)
 async def generate_prompt(
     request: PromptGenerationRequest,
+    db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
     """
@@ -385,6 +389,9 @@ async def generate_prompt(
         if request.prompt_type not in PROMPT_STRATEGIES:
             raise HTTPException(status_code=400, detail=f"Invalid prompt type. Must be one of: {list(PROMPT_STRATEGIES.keys())}")
         
+        # Preflight quota: estimate tokens for generation
+        require_tokens(db, user_id=str(current_user.id), estimated_tokens=1200)
+
         # Generate the prompt
         result = generate_intelligent_prompt(
             prompt_type=request.prompt_type,
