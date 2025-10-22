@@ -12,7 +12,7 @@ PLAN_LIMITS = {
 }
 
 # SQLAlchemy model stubs; replace with your actual models if needed
-from sqlalchemy import Column, Date, BigInteger, TIMESTAMP
+from sqlalchemy import Column, Date, BigInteger, TIMESTAMP, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.ext.declarative import declarative_base
 
@@ -26,11 +26,19 @@ class UserUsage(Base):
     month_tokens_used = Column(BigInteger, nullable=False)
     month_anchor = Column(Date, nullable=False)
     bonus_tokens_remaining = Column(BigInteger, nullable=False)
-    updated_at = Column(TIMESTAMP(timezone=True), nullable=False)
+    updated_at = Column(
+        TIMESTAMP(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+        onupdate=func.now(),
+    )
 
 
 def _get_limits(plan: SubscriptionPlan):
     return PLAN_LIMITS.get(plan.value, PLAN_LIMITS["free"])  # default safe
+
+
+from datetime import datetime, timezone
 
 
 def _ensure_usage_row(db: Session, user_id) -> UserUsage:
@@ -43,6 +51,7 @@ def _ensure_usage_row(db: Session, user_id) -> UserUsage:
             month_tokens_used=0,
             month_anchor=date.today().replace(day=1),
             bonus_tokens_remaining=0,
+            updated_at=datetime.now(timezone.utc),
         )
         db.add(usage)
         db.commit()

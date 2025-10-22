@@ -198,3 +198,19 @@ Authorization: Bearer <token>
 ## Rate Limiting
 
 These endpoints are subject to rate limiting based on the user's subscription plan. Please refer to the API documentation for specific limits.
+
+
+EMAIL="qa+klaviyo-$(date +%s)@example.com"
+curl -i -X POST https://doztra-research.onrender.com/api/auth/register \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"'"$EMAIL"'","name":"QA Klaviyo","password":"StrongPass123!"}'
+
+  curl -i -X POST https://doztra-research.onrender.com/api/auth/register \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"shedrackaji.aji@gmail.com","name":"Dozie Aji","password":"StrongPass123!"}'
+
+
+EMAIL="shedrack+$(date +%s)@dozmanconsulting.com"
+curl -i -X POST https://doztra-research.onrender.com/api/auth/register \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"'"$EMAIL"'","name":"Dozie Aji","password":"StrongPass123!"}'
