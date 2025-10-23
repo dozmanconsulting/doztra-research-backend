@@ -27,7 +27,7 @@ def upgrade():
         sa.Column('resume_path', sa.String(), nullable=True),
         sa.Column('cover_letter', sa.Text(), nullable=True),
         sa.Column('status', sa.String(), nullable=False, server_default='submitted'),
-        sa.Column('metadata', sa.JSON(), nullable=True),
+        sa.Column('extra_data', sa.JSON(), nullable=True),
         sa.Column('created_at', sa.DateTime(), nullable=False, server_default=sa.text('now()')),
         sa.Column('updated_at', sa.DateTime(), nullable=False, server_default=sa.text('now()')),
         sa.PrimaryKeyConstraint('id')

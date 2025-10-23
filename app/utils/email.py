@@ -2,6 +2,7 @@ import logging
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from email.mime.application import MIMEApplication
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 import jinja2
@@ -30,13 +31,16 @@ def send_email(
     email_to: str,
     subject: str,
     html_content: str,
-    text_content: Optional[str] = None
+    text_content: Optional[str] = None,
+    attachments: Optional[List[Dict[str, Any]]] = None,
 ) -> None:
     """Send an email."""
     # For testing - just log the email instead of sending it
     if settings.ENVIRONMENT == "test" or not (settings.SMTP_USER and settings.SMTP_PASSWORD):
         logger.info(f"[MOCK EMAIL] To: {email_to}, Subject: {subject}")
         logger.info(f"[MOCK EMAIL] Content: {text_content or html_content[:100]}...")
+        if attachments:
+            logger.info(f"[MOCK EMAIL] Attachments: {len(attachments)} files")
         return
     
     message = MIMEMultipart('alternative')
@@ -50,6 +54,20 @@ def send_email(
     
     # HTML version
     message.attach(MIMEText(html_content, 'html'))
+    
+    # Attach files if provided
+    if attachments:
+        for att in attachments:
+            try:
+                filename = att.get('filename', 'attachment')
+                content = att.get('content', b'')
+                mime_type = att.get('mime_type', 'application/octet-stream')
+                subtype = mime_type.split('/')[-1]
+                part = MIMEApplication(content, _subtype=subtype)
+                part.add_header('Content-Disposition', 'attachment', filename=filename)
+                message.attach(part)
+            except Exception as e:
+                logger.warning(f"Failed to attach file '{att.get('filename','attachment')}': {e}")
     
     try:
         logger.info(f"Attempting to connect to SMTP server: {settings.SMTP_HOST}:{settings.SMTP_PORT}")
