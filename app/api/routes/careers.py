@@ -10,7 +10,7 @@ from app.db.session import get_db
 from app.models.job_application import JobApplication
 from app.schemas.careers import JobApplicationCreate, JobApplicationResponse
 from app.utils.email import send_email
-from app.services.auth import get_current_admin_user
+from app.services.auth import get_current_admin_user, get_current_active_user
 from app.models.user import User
 
 router = APIRouter()
@@ -26,7 +26,8 @@ async def apply_for_job(
     portfolio: Optional[str] = Form(None),
     cover_letter: Optional[str] = Form(None),
     resume: Optional[UploadFile] = File(None),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
 ):
     """Accept job applications, persist to DB, and send an email notification."""
     try:
@@ -57,7 +58,7 @@ async def apply_for_job(
             cover_letter=cover_letter,
             resume_path=resume_path,
             status="submitted",
-            extra_data={}
+            extra_data={"user_id": str(current_user.id), "user_email": current_user.email}
         )
         db.add(application)
         db.commit()
