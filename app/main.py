@@ -16,7 +16,7 @@ import logging
 import os
 from typing import Optional
 
-from app.api.routes import auth, users, token_usage, user_preferences, usage_statistics, admin, subscription_plans, chat, research_projects, research_content, documents, document_queries, research, research_options, content_feedback, documents_improved, oauth, chat_widget, prompt_generation, contact, support, research_generation, billing, usage
+from app.api.routes import auth, users, token_usage, user_preferences, usage_statistics, admin, subscription_plans, chat, research_projects, research_content, documents, document_queries, research, research_options, content_feedback, documents_improved, oauth, chat_widget, prompt_generation, contact, support, research_generation, billing, usage, careers
 from app.core.config import settings
 from app.services.auth import get_current_user, verify_token
 from app.services.admin import verify_admin_token, security
@@ -138,6 +138,9 @@ app.include_router(contact.router, prefix="/api", tags=["Contact"])
 
 # Support routes
 app.include_router(support.router, prefix="/api", tags=["Support"])
+
+# Careers routes
+app.include_router(careers.router, prefix="/api", tags=["Careers"])
 
 # Billing routes
 app.include_router(billing.router, prefix="/api", tags=["Billing"])
