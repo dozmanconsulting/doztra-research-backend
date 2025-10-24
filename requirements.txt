@@ -43,22 +43,21 @@ seaborn==0.13.2
 pandas==2.3.3
 pillow==11.3.0
 
-# Multi-modal Knowledge Base dependencies (core only for now)
-# Note: AI/ML dependencies will be added in separate optional requirements
-# zep-python  # Zep AI for conversation memory - conflicts with pydantic v2
-# pymilvus  # Milvus vector database client
-# assemblyai  # AssemblyAI for speech-to-text
-firecrawl-py==4.5.0  # Firecrawl for web scraping (latest available)
-youtube-dl==2021.12.17  # YouTube content extraction
-yt-dlp==2023.12.30  # Modern YouTube downloader
-# torch  # PyTorch for Kokoro 82M - large dependency
-# torchaudio  # Audio processing for PyTorch
-# transformers  # Hugging Face transformers
-# sentence-transformers  # Sentence embeddings
-# librosa  # Audio analysis
-soundfile==0.12.1  # Audio file I/O
-pydub==0.25.1  # Audio manipulation
-ffmpeg-python==0.2.0  # Audio/video processing
+# Multi-modal Knowledge Base dependencies (lightweight for now)
+# Note: Heavy AI/ML dependencies moved to requirements-ai.txt to avoid installation issues
+firecrawl-py==4.5.0  # Firecrawl for web scraping
+
+# YouTube content extraction (lightweight)
+youtube-dl==2021.12.17
+yt-dlp==2023.12.30
+
+# Basic audio processing (no heavy ML dependencies)
+soundfile==0.12.1
+pydub==0.25.1
+ffmpeg-python==0.2.0
+
+# Note: PyTorch, transformers, pymilvus, etc. moved to requirements-ai.txt
+# Install separately when needed: pip install -r requirements-ai.txt
 
 # Utility dependencies
 typing-extensions==4.15.0
