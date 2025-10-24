@@ -59,7 +59,7 @@ class User(Base):
     # document_queries = relationship("DocumentQuery", back_populates="user", cascade="all, delete-orphan")  # Model doesn't exist
     token_usage = relationship("TokenUsage", back_populates="user", cascade="all, delete-orphan")
     user_preferences = relationship("UserPreferences", back_populates="user", uselist=False, cascade="all, delete-orphan")
-    chat_conversations = relationship("ChatConversation", back_populates="user", cascade="all, delete-orphan")
+    # chat_conversations = relationship("ChatConversation", back_populates="user", cascade="all, delete-orphan")  # Model doesn't exist
     research_content = relationship("ResearchContent", back_populates="user", cascade="all, delete-orphan")
     content_feedback = relationship("ContentFeedback", back_populates="user", cascade="all, delete-orphan")
     support_requests = relationship("SupportRequest", back_populates="user", cascade="all, delete-orphan")
