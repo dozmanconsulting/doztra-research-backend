@@ -17,10 +17,10 @@ python-dotenv==1.1.1
 starlette==0.48.0
 
 # HTTP and API dependencies
-httpx==0.28.1
+httpx==0.24.1
 requests==2.32.5
 aiohttp==3.10.11
-openai==2.2.0
+openai==1.51.0
 stripe==10.9.0
 
 # Cloud storage dependencies
@@ -43,18 +43,19 @@ seaborn==0.13.2
 pandas==2.3.3
 pillow==11.3.0
 
-# Multi-modal Knowledge Base dependencies
-zep-python==2.0.0rc5  # Zep AI for conversation memory
-pymilvus==2.4.8  # Milvus vector database client
-assemblyai==0.33.0  # AssemblyAI for speech-to-text
-firecrawl-py==1.4.7  # Firecrawl for web scraping
+# Multi-modal Knowledge Base dependencies (core only for now)
+# Note: AI/ML dependencies will be added in separate optional requirements
+# zep-python  # Zep AI for conversation memory - conflicts with pydantic v2
+# pymilvus  # Milvus vector database client
+# assemblyai  # AssemblyAI for speech-to-text
+firecrawl-py==4.5.0  # Firecrawl for web scraping (latest available)
 youtube-dl==2021.12.17  # YouTube content extraction
-yt-dlp==2024.12.13  # Modern YouTube downloader
-torch==2.5.1  # PyTorch for Kokoro 82M
-torchaudio==2.5.1  # Audio processing for PyTorch
-transformers==4.47.1  # Hugging Face transformers
-sentence-transformers==3.3.1  # Sentence embeddings
-librosa==0.10.2  # Audio analysis
+yt-dlp==2023.12.30  # Modern YouTube downloader
+# torch  # PyTorch for Kokoro 82M - large dependency
+# torchaudio  # Audio processing for PyTorch
+# transformers  # Hugging Face transformers
+# sentence-transformers  # Sentence embeddings
+# librosa  # Audio analysis
 soundfile==0.12.1  # Audio file I/O
 pydub==0.25.1  # Audio manipulation
 ffmpeg-python==0.2.0  # Audio/video processing

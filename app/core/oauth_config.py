@@ -11,19 +11,23 @@ class OAuthConfig(BaseModel):
     redirect_uri: str
     scope: List[str]
 
-# Google OAuth configuration
-google_oauth_config = OAuthConfig(
-    client_id=settings.GOOGLE_OAUTH_CLIENT_ID,
-    client_secret=settings.GOOGLE_OAUTH_CLIENT_SECRET,
-    authorize_url="https://accounts.google.com/o/oauth2/auth",
-    token_url="https://oauth2.googleapis.com/token",
-    userinfo_url="https://www.googleapis.com/oauth2/v3/userinfo",
-    redirect_uri="https://doztra-research.onrender.com/api/auth/oauth/google/callback",
-    scope=["email", "profile"]
-)
-
 # Dictionary of supported OAuth providers
-oauth_configs: Dict[str, OAuthConfig] = {
-    "google": google_oauth_config,
-    # Add more providers here as needed
-}
+oauth_configs: Dict[str, OAuthConfig] = {}
+
+# Only initialize OAuth configs if credentials are available
+if hasattr(settings, 'GOOGLE_OAUTH_CLIENT_ID') and settings.GOOGLE_OAUTH_CLIENT_ID:
+    try:
+        google_oauth_config = OAuthConfig(
+            client_id=settings.GOOGLE_OAUTH_CLIENT_ID,
+            client_secret=settings.GOOGLE_OAUTH_CLIENT_SECRET,
+            authorize_url="https://accounts.google.com/o/oauth2/auth",
+            token_url="https://oauth2.googleapis.com/token",
+            userinfo_url="https://www.googleapis.com/oauth2/v3/userinfo",
+            redirect_uri="https://doztra-research.onrender.com/api/auth/oauth/google/callback",
+            scope=["email", "profile"]
+        )
+        oauth_configs["google"] = google_oauth_config
+    except Exception as e:
+        print(f"Warning: Failed to initialize Google OAuth config: {e}")
+
+# Add more providers here as needed

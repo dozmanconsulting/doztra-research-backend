@@ -1,0 +1,26 @@
+# AI/ML Dependencies for Multi-Modal Knowledge Base
+# Install these separately after core dependencies are working
+# Note: These have complex dependency conflicts that need to be resolved
+
+# Conversation Memory (Pydantic v1 conflict)
+# zep-python>=0.32
+
+# Vector Database
+pymilvus>=2.4.0
+
+# Speech Processing
+assemblyai>=0.30.0
+
+# AI/ML Models (Large dependencies)
+torch>=2.0.0
+torchaudio>=2.0.0
+transformers>=4.30.0
+sentence-transformers>=2.2.0
+
+# Audio Analysis
+librosa>=0.10.0
+
+# Installation instructions:
+# 1. First install core requirements: pip install -r requirements.txt
+# 2. Then install AI dependencies: pip install -r requirements-ai.txt
+# 3. May need to resolve conflicts manually or use conda environment
