@@ -7,3 +7,4 @@ from app.models.research_project import ResearchProject, ProjectStatus
 from app.models.document import Document
 from app.models.conversations import ConversationSession, MessageFeedback, ConversationAnalytics, ConversationExport
 from app.models.content_items import ContentItem, ContentChunk, ProcessingJob, VectorIndex
+from app.models.content_feedback import ContentFeedback
