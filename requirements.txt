@@ -43,6 +43,22 @@ seaborn==0.13.2
 pandas==2.3.3
 pillow==11.3.0
 
+# Multi-modal Knowledge Base dependencies
+zep-python==2.0.0rc5  # Zep AI for conversation memory
+pymilvus==2.4.8  # Milvus vector database client
+assemblyai==0.33.0  # AssemblyAI for speech-to-text
+firecrawl-py==1.4.7  # Firecrawl for web scraping
+youtube-dl==2021.12.17  # YouTube content extraction
+yt-dlp==2024.12.13  # Modern YouTube downloader
+torch==2.5.1  # PyTorch for Kokoro 82M
+torchaudio==2.5.1  # Audio processing for PyTorch
+transformers==4.47.1  # Hugging Face transformers
+sentence-transformers==3.3.1  # Sentence embeddings
+librosa==0.10.2  # Audio analysis
+soundfile==0.12.1  # Audio file I/O
+pydub==0.25.1  # Audio manipulation
+ffmpeg-python==0.2.0  # Audio/video processing
+
 # Utility dependencies
 typing-extensions==4.15.0
 anyio==4.11.0
