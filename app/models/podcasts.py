@@ -46,7 +46,7 @@ class Podcast(Base):
     podcast_settings = Column(JSON, default={})
     
     # Metadata
-    metadata = Column(JSON, default={})
+    podcast_metadata = Column(JSON, default={})
     
     # Timestamps
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
@@ -84,7 +84,7 @@ class PodcastScriptSegment(Base):
     voice_settings = Column(JSON, default={})
     
     # Segment metadata
-    metadata = Column(JSON, default={})
+    segment_metadata = Column(JSON, default={})
     
     # Timestamps
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)

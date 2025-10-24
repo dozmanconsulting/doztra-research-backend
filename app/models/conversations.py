@@ -58,7 +58,7 @@ class MessageFeedback(Base):
     feedback_type = Column(String(50), nullable=True)  # helpful, accurate, relevant, etc.
     
     # Feedback metadata
-    metadata = Column(JSON, default={})
+    feedback_metadata = Column(JSON, default={})
     
     # Timestamps
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
@@ -121,7 +121,7 @@ class ConversationExport(Base):
     
     # Export settings
     include_sources = Column(Boolean, default=True)
-    include_metadata = Column(Boolean, default=False)
+    include_export_metadata = Column(Boolean, default=False)
     export_settings = Column(JSON, default={})
     
     # Export status
