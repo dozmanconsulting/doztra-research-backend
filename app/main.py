@@ -471,7 +471,25 @@ async def admin_docs_page():
 # API landing page (public)
 @app.get("/", include_in_schema=False)
 async def root():
-    return {"message": "Welcome to Doztra Auth Service API"}
+    return {
+        "message": "Welcome to Doztra Knowledge Base API", 
+        "status": "running",
+        "version": "1.0.0",
+        "endpoints": {
+            "health": "/health",
+            "docs": "/docs",
+            "api": "/api/"
+        }
+    }
+
+# Simple health check (public)
+@app.get("/health", include_in_schema=False)
+async def health_check():
+    return {
+        "status": "healthy",
+        "message": "API is running successfully",
+        "timestamp": datetime.now().isoformat()
+    }
 
 @app.get("/editor", response_class=HTMLResponse, include_in_schema=False)
 async def content_editor(request: Request):
