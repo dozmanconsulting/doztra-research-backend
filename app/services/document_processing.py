@@ -143,8 +143,45 @@ class DocumentProcessor:
             '.sql': self._process_code,
         }
     
+    def get_supported_formats(self) -> Dict[str, bool]:
+        """Get list of supported formats and their availability"""
+        return {
+            'pdf': PDF_AVAILABLE,
+            'docx': DOCX_AVAILABLE,
+            'xlsx': EXCEL_AVAILABLE,
+            'pptx': PPTX_AVAILABLE,
+            'markdown': MARKDOWN_AVAILABLE,
+            'yaml': YAML_AVAILABLE,
+            'eml': EML_AVAILABLE,
+            'rar': RAR_AVAILABLE,
+            'ocr': OCR_AVAILABLE,
+        }
+    
+    def check_format_support(self, file_extension: str) -> tuple[bool, str]:
+        """Check if a format is supported and return status message"""
+        ext = file_extension.lower()
+        
+        format_checks = {
+            '.pdf': (PDF_AVAILABLE, "PyPDF2 library not available"),
+            '.docx': (DOCX_AVAILABLE, "python-docx library not available"),
+            '.xlsx': (EXCEL_AVAILABLE, "openpyxl library not available"),
+            '.pptx': (PPTX_AVAILABLE, "python-pptx library not available"),
+            '.md': (MARKDOWN_AVAILABLE, "markdown library not available"),
+            '.yaml': (YAML_AVAILABLE, "pyyaml library not available"),
+            '.yml': (YAML_AVAILABLE, "pyyaml library not available"),
+            '.eml': (EML_AVAILABLE, "eml-parser library not available"),
+            '.rar': (RAR_AVAILABLE, "rarfile library not available"),
+        }
+        
+        if ext in format_checks:
+            available, error_msg = format_checks[ext]
+            if not available:
+                return False, f"Cannot process {ext} files: {error_msg}. Please install the required dependency."
+        
+        return True, "Format supported"
+
     async def process_document(self, file_path: str) -> Dict[str, Any]:
-        """Process document and extract content"""
+        """Process document and extract content with proper error handling"""
         try:
             file_path = Path(file_path)
             file_extension = file_path.suffix.lower()
@@ -154,6 +191,16 @@ class DocumentProcessor:
                     "success": False,
                     "error": f"Unsupported file format: {file_extension}",
                     "supported_formats": list(self.supported_formats.keys())
+                }
+            
+            # Check if the required libraries are available for this format
+            is_supported, support_message = self.check_format_support(file_extension)
+            if not is_supported:
+                return {
+                    "success": False,
+                    "error": support_message,
+                    "format": file_extension,
+                    "suggestion": "Install the required dependency or use a different file format"
                 }
             
             # Get file metadata
