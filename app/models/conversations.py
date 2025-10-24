@@ -27,7 +27,7 @@ class ConversationSession(Base):
     total_tokens_used = Column(Integer, default=0)
     
     # Session settings and metadata
-    metadata = Column(JSON, default={})
+    session_metadata = Column(JSON, default={})
     settings = Column(JSON, default={})
     
     # Timestamps
