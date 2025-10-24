@@ -13,9 +13,9 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # API Keys
-ASSEMBLYAI_API_KEY = os.getenv("ASSEMBLYAI_API_KEY", "ba9ebbf2cdc34058893aa098e42b58e4")
-FIRECRAWL_API_KEY = os.getenv("FIRECRAWL_API_KEY", "fc-5d211b19270f45b1b51a9d7eebafa9e0")
-YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY", "AIzaSyBUGEfl0yfZwLzA-gN0RiRlqGx2M3nD0uo")
+ASSEMBLYAI_API_KEY = os.getenv("ASSEMBLYAI_API_KEY")
+FIRECRAWL_API_KEY = os.getenv("FIRECRAWL_API_KEY")
+YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY")
 
 async def test_assemblyai():
     """Test AssemblyAI API connection"""

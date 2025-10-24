@@ -1,0 +1,116 @@
+# Render.com Production Requirements
+# Based on proven requirements.txt + advanced features
+
+# Core FastAPI and web framework (from working requirements.txt)
+fastapi==0.118.2
+uvicorn==0.37.0
+starlette==0.48.0
+
+# Database and ORM (from working requirements.txt)
+sqlalchemy==2.0.43
+psycopg2-binary==2.9.10
+alembic==1.16.5
+
+# Authentication and security (from working requirements.txt)
+pydantic==2.12.0
+pydantic-core==2.41.1
+pydantic-settings==2.11.0
+python-jose==3.5.0
+passlib==1.7.4
+bcrypt==4.0.1
+python-multipart==0.0.20
+jinja2==3.1.6
+email-validator==2.3.0
+
+# HTTP clients and async support (from working requirements.txt)
+httpx==0.24.1
+requests==2.32.5
+aiohttp==3.10.11
+aiofiles==23.2.1
+
+# Environment and configuration (from working requirements.txt)
+python-dotenv==1.1.1
+
+# Cloud storage (from working requirements.txt)
+google-cloud-storage==2.15.0
+boto3==1.35.0
+
+# OpenAI (from working requirements.txt)
+openai==1.51.0
+
+# Advanced Processing Services
+# Web scraping with Firecrawl (additional dependencies)
+beautifulsoup4==4.12.2
+lxml==4.9.3
+
+# Document processing (from working requirements.txt)
+python-docx==1.1.0
+PyPDF2==3.0.1
+
+# NLP and text analysis (from working requirements.txt)
+spacy==3.8.7
+nltk==3.9.2
+
+# Visualization (from working requirements.txt)
+matplotlib==3.10.7
+seaborn==0.13.2
+pandas==2.3.3
+pillow==11.3.0
+
+# Firecrawl (from working requirements.txt)
+firecrawl-py==4.5.0
+
+# YouTube processing (from working requirements.txt)
+youtube-dl==2021.12.17
+yt-dlp==2023.12.30
+
+# Audio processing (from working requirements.txt)
+soundfile==0.12.1
+pydub==0.25.1
+ffmpeg-python==0.2.0
+
+# Vector database - Milvus/Zilliz Cloud (NEW)
+pymilvus==2.3.4
+
+# Embeddings and ML (NEW)
+sentence-transformers==2.2.2
+numpy==1.24.4
+
+# YouTube API (NEW)
+youtube-transcript-api==0.6.1
+google-api-python-client==2.108.0
+
+# AssemblyAI (NEW)
+assemblyai==0.17.0
+
+# Utilities (from working requirements.txt)
+typing-extensions==4.15.0
+anyio==4.11.0
+click==8.3.0
+
+# Utilities
+python-magic==0.4.27
+chardet==5.2.0
+validators==0.22.0
+python-dateutil==2.8.2
+pytz==2023.3
+
+# File handling
+filetype==1.2.0
+pathlib2==2.3.7
+
+# JSON and data handling
+orjson==3.9.10
+
+# Logging and monitoring
+structlog==23.2.0
+
+# Security
+cryptography==41.0.8
+bcrypt==4.1.2
+
+# Background tasks (optional but recommended)
+celery==5.3.4
+
+# Development tools (optional)
+python-cors==1.0.0

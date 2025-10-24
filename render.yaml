@@ -1,0 +1,21 @@
+# Render.com deployment configuration
+services:
+  - type: web
+    name: doztra-knowledge-base-api
+    env: python
+    buildCommand: pip install -r requirements_render.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    plan: starter  # or free
+    region: oregon  # or your preferred region
+    branch: feature/multimodal-knowledge-base
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.0
+      - key: DEBUG
+        value: false
+      - key: ENVIRONMENT
+        value: production
+      - key: LOG_LEVEL
+        value: INFO
+      # Database will be set via Render dashboard
+      # API keys will be set via Render dashboard for security

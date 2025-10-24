@@ -15,16 +15,17 @@ def test_zilliz_connection():
     print("🚀 Testing Zilliz Cloud Connection")
     print("=" * 40)
     
-    # Your Zilliz Cloud credentials
-    host = "in03-e4f450bc127b4a7.serverless.aws-eu-central-1.cloud.zilliz.com"
-    port = 19530
-    user = "db_e4f450bc127b4a7"
-    password = "Vj8&+FPEo{G9F17r"
+    # Get Zilliz Cloud credentials from environment
+    host = os.getenv("MILVUS_HOST", "localhost")
+    port = int(os.getenv("MILVUS_PORT", "19530"))
+    user = os.getenv("MILVUS_USER")
+    password = os.getenv("MILVUS_PASSWORD")
+    use_secure = os.getenv("MILVUS_USE_SECURE", "false").lower() == "true"
     
     print(f"🔗 Connecting to: {host}")
-    print(f"👤 User: {user}")
-    print(f"🔐 Password: {'*' * len(password)}")
-    print(f"🔒 Secure: True")
+    print(f"👤 User: {user or 'None'}")
+    print(f"🔐 Password: {'*' * len(password) if password else 'None'}")
+    print(f"🔒 Secure: {use_secure}")
     print()
     
     try:
@@ -32,16 +33,22 @@ def test_zilliz_connection():
         
         print("📦 pymilvus library loaded successfully")
         
-        # Connect to Zilliz Cloud
+        # Connect to Zilliz Cloud or local Milvus
         print("🔌 Attempting connection...")
-        connections.connect(
-            alias="default",
-            host=host,
-            port=port,
-            user=user,
-            password=password,
-            secure=True
-        )
+        connection_params = {
+            "alias": "default",
+            "host": host,
+            "port": port
+        }
+        
+        if user and password:
+            connection_params["user"] = user
+            connection_params["password"] = password
+            
+        if use_secure:
+            connection_params["secure"] = True
+            
+        connections.connect(**connection_params)
         
         if connections.has_connection("default"):
             print("✅ Connected to Zilliz Cloud successfully!")
