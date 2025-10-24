@@ -4,6 +4,7 @@ Handles content management for the knowledge base with advanced processing
 """
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, BackgroundTasks, status
+from sqlalchemy import desc
 from sqlalchemy.orm import Session
 from typing import List, Optional, Dict, Any
 import uuid
@@ -515,6 +516,67 @@ async def search_content_vectors(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Search failed: {str(e)}")
 
+# ---------------------------------------------------------------------------
+# Helper utilities for content chunking and persistence
+# ---------------------------------------------------------------------------
+def _split_into_chunks(text: str, max_chars: int = 1800):
+    """Split long text into reasonably sized chunks while preserving sentence boundaries.
+    Fallbacks to hard splits if punctuation-aware splitting isn't sufficient.
+    """
+    if not text:
+        return []
+
+    text = text.strip()
+    if len(text) <= max_chars:
+        return [text]
+
+    chunks = []
+    start = 0
+    while start < len(text):
+        end = min(start + max_chars, len(text))
+        # Try to break at the last period/newline within window
+        window = text[start:end]
+        split_at = max(window.rfind(". "), window.rfind("\n"), window.rfind("! "), window.rfind("? "))
+        if split_at == -1 or (end == len(text)):
+            chunk = window
+            next_start = end
+        else:
+            chunk = window[: split_at + 1]
+            next_start = start + split_at + 1
+        chunks.append(chunk.strip())
+        start = next_start
+    return [c for c in chunks if c]
+
+
+def _save_chunks_for_item(db: Session, item: ContentItem, processed_content: str):
+    """Persist processed content into ContentChunk rows even if vector DB is unavailable."""
+    if not processed_content:
+        return
+
+    # Remove any existing chunks to avoid duplication on re-processing
+    existing = db.query(ContentChunk).filter(ContentChunk.content_item_id == item.id).all()
+    if existing:
+        for ch in existing:
+            db.delete(ch)
+        db.flush()
+
+    pieces = _split_into_chunks(processed_content)
+    for idx, piece in enumerate(pieces):
+        chunk = ContentChunk(
+            chunk_id=f"chunk_{item.content_id}_{idx}",
+            content_item_id=item.id,
+            text=piece,
+            chunk_index=idx,
+            word_count=len(piece.split()),
+            chunk_metadata={
+                "source_url": item.source_url,
+                "content_type": item.content_type,
+                "title": item.title,
+            },
+        )
+        db.add(chunk)
+    db.commit()
+
 @router.get("/search")
 async def search_all_content(
     query: str,
@@ -577,16 +639,22 @@ async def process_content_background(content_id: str, user_id: str, content_type
         item.processing_progress = 0.7
         db.commit()
         
-        # Add to vector database
+        # Persist chunks regardless of vector availability
         if processed_content:
-            await vector_service.add_content(
-                content_id=content_id,
-                user_id=user_id,
-                content_type=content_type,
-                title=item.title,
-                content=processed_content,
-                metadata=item.content_metadata
-            )
+            _save_chunks_for_item(db, item, processed_content)
+            # Best-effort vector addition (optional)
+            try:
+                await vector_service.add_content(
+                    content_id=content_id,
+                    user_id=user_id,
+                    content_type=content_type,
+                    title=item.title,
+                    content=processed_content,
+                    metadata=item.content_metadata
+                )
+            except Exception:
+                # Vector DB is optional; continue gracefully
+                pass
         
         # Mark as completed
         item.processing_status = "completed"
@@ -601,6 +669,86 @@ async def process_content_background(content_id: str, user_id: str, content_type
         db.commit()
     finally:
         db.close()
+
+# ---------------------------------------------------------------------------
+# Retrieval endpoints for content chunks and quick user context
+# ---------------------------------------------------------------------------
+
+@router.get("/items/{content_id}/chunks")
+async def get_item_chunks(
+    content_id: str,
+    limit: int = 20,
+    offset: int = 0,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Retrieve stored chunks for a specific content item."""
+    item = db.query(ContentItem).filter(
+        ContentItem.content_id == content_id,
+        ContentItem.user_id == current_user.id
+    ).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Content item not found")
+
+    chunks = (
+        db.query(ContentChunk)
+        .filter(ContentChunk.content_item_id == item.id)
+        .order_by(ContentChunk.chunk_index.asc())
+        .offset(offset)
+        .limit(limit)
+        .all()
+    )
+    return {
+        "content_id": content_id,
+        "title": item.title,
+        "content_type": item.content_type,
+        "chunks": [
+            {
+                "chunk_id": str(ch.id),
+                "index": ch.chunk_index,
+                "text": ch.text,
+                "word_count": ch.word_count,
+            }
+            for ch in chunks
+        ],
+        "total_chunks": db.query(ContentChunk).filter(ContentChunk.content_item_id == item.id).count(),
+    }
+
+
+@router.get("/context")
+async def get_user_context(
+    limit: int = 8,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Return the latest chunk snippets across the user's completed content items.
+    Useful for building chat context when vector search is unavailable.
+    """
+    # Join chunks with content items, filter by user and completed status
+    q = (
+        db.query(ContentChunk, ContentItem)
+        .join(ContentItem, ContentChunk.content_item_id == ContentItem.id)
+        .filter(ContentItem.user_id == current_user.id)
+        .filter(ContentItem.processing_status == "completed")
+        .order_by(ContentChunk.created_at.desc())
+        .limit(limit)
+    )
+
+    rows = q.all()
+    results = []
+    for ch, it in rows:
+        snippet = ch.text if len(ch.text) <= 700 else ch.text[:700] + "..."
+        results.append(
+            {
+                "content_id": it.content_id,
+                "title": it.title,
+                "content_type": it.content_type,
+                "chunk_index": ch.chunk_index,
+                "text": snippet,
+            }
+        )
+
+    return {"items": results, "total": len(results)}
 
 async def process_url_background(content_id: str, url: str, user_id: str, content_type: str):
     """Background task for processing URLs"""
@@ -639,16 +787,21 @@ async def process_url_background(content_id: str, url: str, user_id: str, conten
         item.processing_progress = 0.7
         db.commit()
         
-        # Add to vector database
+        # Persist chunks regardless of vector availability
         if processed_content:
-            await vector_service.add_content(
-                content_id=content_id,
-                user_id=user_id,
-                content_type=content_type,
-                title=item.title,
-                content=processed_content,
-                metadata=item.content_metadata
-            )
+            _save_chunks_for_item(db, item, processed_content)
+            # Best-effort vector addition (optional)
+            try:
+                await vector_service.add_content(
+                    content_id=content_id,
+                    user_id=user_id,
+                    content_type=content_type,
+                    title=item.title,
+                    content=processed_content,
+                    metadata=item.content_metadata
+                )
+            except Exception:
+                pass
         
         # Mark as completed
         item.processing_status = "completed"
@@ -698,16 +851,21 @@ async def transcribe_audio_background(content_id: str, file_path: str, user_id: 
         item.processing_progress = 0.7
         db.commit()
         
-        # Add to vector database
+        # Persist chunks regardless of vector availability
         if processed_content:
-            await vector_service.add_content(
-                content_id=content_id,
-                user_id=user_id,
-                content_type="audio",
-                title=item.title,
-                content=processed_content,
-                metadata=item.content_metadata
-            )
+            _save_chunks_for_item(db, item, processed_content)
+            # Best-effort vector addition (optional)
+            try:
+                await vector_service.add_content(
+                    content_id=content_id,
+                    user_id=user_id,
+                    content_type="audio",
+                    title=item.title,
+                    content=processed_content,
+                    metadata=item.content_metadata
+                )
+            except Exception:
+                pass
         
         # Mark as completed
         item.processing_status = "completed"
