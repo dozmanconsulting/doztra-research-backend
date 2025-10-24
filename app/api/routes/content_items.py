@@ -3,7 +3,7 @@ Content Items API Routes
 Handles content management for the knowledge base with advanced processing
 """
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, BackgroundTasks, status
 from sqlalchemy.orm import Session
 from typing import List, Optional, Dict, Any
 import uuid
