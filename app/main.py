@@ -16,7 +16,7 @@ import logging
 import os
 from typing import Optional
 
-from app.api.routes import auth, users, token_usage, user_preferences, usage_statistics, admin, subscription_plans, chat, research_projects, research_content, documents, document_queries, research, research_options, content_feedback, documents_improved, oauth, chat_widget, prompt_generation, contact, support, research_generation, billing, usage, careers, knowledge_base, conversations, podcasts, conversation_sessions, content_items, podcast_api
+from app.api.routes import auth, users, token_usage, user_preferences, usage_statistics, admin, subscription_plans, chat, research_projects, research_content, documents, document_queries, research, research_options, content_feedback, documents_improved, oauth, chat_widget, prompt_generation, contact, support, research_generation, billing, usage, careers, knowledge_base, conversations, podcasts, conversation_sessions, content_items, podcast_api, system_info
 from app.core.config import settings
 from app.services.auth import get_current_user, verify_token
 from app.services.admin import verify_admin_token, security
@@ -157,6 +157,9 @@ app.include_router(podcasts.router, tags=["Podcasts"])
 app.include_router(conversation_sessions.router, tags=["Conversation Sessions"])
 app.include_router(content_items.router, tags=["Content Items"])
 app.include_router(podcast_api.router, tags=["Podcast API"])
+
+# System information and health routes
+app.include_router(system_info.router, prefix="/api/system", tags=["System Information"])
 
 # Custom exception handler for validation errors
 @app.exception_handler(RequestValidationError)
