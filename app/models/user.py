@@ -51,27 +51,16 @@ class User(Base):
     oauth_refresh_token = Column(String, nullable=True)
     oauth_token_expires_at = Column(DateTime, nullable=True)
     
-    # Relationships
+    # Relationships (restored to original working state)
     subscription = relationship("Subscription", back_populates="user", uselist=False)
-    refresh_tokens = relationship("RefreshToken", back_populates="user", cascade="all, delete-orphan")
-    research_projects = relationship("ResearchProject", back_populates="user", cascade="all, delete-orphan")
-    documents = relationship("Document", back_populates="user", cascade="all, delete-orphan")
-    # document_queries = relationship("DocumentQuery", back_populates="user", cascade="all, delete-orphan")  # Model doesn't exist
-    token_usage = relationship("TokenUsage", back_populates="user", cascade="all, delete-orphan")
-    user_preferences = relationship("UserPreferences", back_populates="user", uselist=False, cascade="all, delete-orphan")
-    # chat_conversations = relationship("ChatConversation", back_populates="user", cascade="all, delete-orphan")  # Model doesn't exist
-    research_content = relationship("ResearchContent", back_populates="user", cascade="all, delete-orphan")
-    content_feedback = relationship("ContentFeedback", back_populates="user", cascade="all, delete-orphan")
-    support_requests = relationship("SupportRequest", back_populates="user", cascade="all, delete-orphan")
-    prompt_generations = relationship("PromptGeneration", back_populates="user", cascade="all, delete-orphan")
-    billing_records = relationship("BillingRecord", back_populates="user", cascade="all, delete-orphan")
-    usage_records = relationship("UsageRecord", back_populates="user", cascade="all, delete-orphan")
-    career_applications = relationship("CareerApplication", back_populates="user", cascade="all, delete-orphan")
-    content_items = relationship("ContentItem", back_populates="user", cascade="all, delete-orphan")
-    conversation_sessions = relationship("ConversationSession", back_populates="user", cascade="all, delete-orphan")
-    podcasts = relationship("Podcast", back_populates="user", cascade="all, delete-orphan")
-    usage_statistics = relationship("UsageStatistics", back_populates="user", uselist=False, cascade="all, delete-orphan")
-    conversations = relationship("Conversation", back_populates="user", cascade="all, delete-orphan")
+    refresh_tokens = relationship("RefreshToken", back_populates="user", cascade="all, delete")
+    token_usage = relationship("TokenUsage", back_populates="user", cascade="all, delete")
+    token_usage_summary = relationship("TokenUsageSummary", back_populates="user", cascade="all, delete")
+    user_preferences = relationship("UserPreferences", back_populates="user", uselist=False, cascade="all, delete")
+    usage_statistics = relationship("UsageStatistics", back_populates="user", uselist=False, cascade="all, delete")
+    conversations = relationship("Conversation", back_populates="user", cascade="all, delete")
+    research_projects = relationship("ResearchProject", back_populates="user", cascade="all, delete")
+    documents = relationship("Document", back_populates="user", cascade="all, delete")
 
 
 class Subscription(Base):
