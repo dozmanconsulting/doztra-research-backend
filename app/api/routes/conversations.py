@@ -54,14 +54,17 @@ async def create_conversation_session(
         )
         
         # Initialize session in Zep AI memory
+        metadata = {
+            "user_name": current_user.name,
+            "user_email": current_user.email,
+        }
+        if request.metadata:
+            metadata.update(request.metadata)
+            
         await conversation_memory.create_session(
             session_id=session_id,
             user_id=current_user.id,
-            metadata={  
-                "user_name": current_user.name,
-                "user_email": current_user.email,
-                **request.metadata or {}
-            }
+            metadata=metadata
         )
         
         return CreateSessionResponse(
