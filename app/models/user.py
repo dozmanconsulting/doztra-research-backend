@@ -61,6 +61,10 @@ class User(Base):
     conversations = relationship("Conversation", back_populates="user", cascade="all, delete")
     research_projects = relationship("ResearchProject", back_populates="user", cascade="all, delete")
     documents = relationship("Document", back_populates="user", cascade="all, delete")
+    
+    # Knowledge Base Features (added incrementally)
+    conversation_sessions = relationship("ConversationSession", back_populates="user", cascade="all, delete-orphan")
+    content_items = relationship("ContentItem", back_populates="user", cascade="all, delete-orphan")
 
 
 class Subscription(Base):
