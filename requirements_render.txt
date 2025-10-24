@@ -46,6 +46,8 @@ lxml==4.9.3
 # Document processing (from working requirements.txt)
 python-docx==1.1.0
 PyPDF2==3.0.1
+openpyxl==3.1.2
+python-pptx==0.6.23
 
 # NLP and text analysis (from working requirements.txt)
 spacy==3.8.7
@@ -83,34 +85,22 @@ google-api-python-client==2.108.0
 # AssemblyAI (NEW)
 assemblyai==0.17.0
 
+# Additional dependencies for advanced features
+eml-parser==1.17.6
+chardet==5.2.0
+validators==0.22.0
+python-dateutil==2.8.2
+pytz==2023.3
+filetype==1.2.0
+
 # Utilities (from working requirements.txt)
 typing-extensions==4.15.0
 anyio==4.11.0
 click==8.3.0
 
-# Utilities
+# Additional utilities
 python-magic==0.4.27
-chardet==5.2.0
-validators==0.22.0
-python-dateutil==2.8.2
-pytz==2023.3
-
-# File handling
-filetype==1.2.0
 pathlib2==2.3.7
-
-# JSON and data handling
 orjson==3.9.10
-
-# Logging and monitoring
 structlog==23.2.0
-
-# Security
 cryptography==41.0.8
-bcrypt==4.1.2
-
-# Background tasks (optional but recommended)
-celery==5.3.4
-
-# Development tools (optional)
-python-cors==1.0.0

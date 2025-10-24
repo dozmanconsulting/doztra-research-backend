@@ -11,18 +11,49 @@ from pathlib import Path
 import mimetypes
 
 # Document processing libraries
-import PyPDF2
-import docx
-import openpyxl
 import csv
 import json
 import xml.etree.ElementTree as ET
-from pptx import Presentation
-import eml_parser
 import zipfile
-import rarfile
 import markdown
 import yaml
+
+# Optional document libraries
+try:
+    import PyPDF2
+    PDF_AVAILABLE = True
+except ImportError:
+    PDF_AVAILABLE = False
+
+try:
+    import docx
+    DOCX_AVAILABLE = True
+except ImportError:
+    DOCX_AVAILABLE = False
+
+try:
+    import openpyxl
+    EXCEL_AVAILABLE = True
+except ImportError:
+    EXCEL_AVAILABLE = False
+
+try:
+    from pptx import Presentation
+    PPTX_AVAILABLE = True
+except ImportError:
+    PPTX_AVAILABLE = False
+
+try:
+    import eml_parser
+    EML_AVAILABLE = True
+except ImportError:
+    EML_AVAILABLE = False
+
+try:
+    import rarfile
+    RAR_AVAILABLE = True
+except ImportError:
+    RAR_AVAILABLE = False
 
 # OCR and image processing
 try:
