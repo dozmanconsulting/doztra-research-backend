@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, B
 from sqlalchemy import desc
 from sqlalchemy.orm import Session
 from typing import List, Optional, Dict, Any
+import re
 import uuid
 from datetime import datetime
 import json
@@ -272,6 +273,18 @@ async def upload_content_file(
                 content_type = "video"
             elif file.content_type == "application/pdf":
                 content_type = "pdf"
+
+        # Persist file to disk so background processors can access it
+        upload_dir = os.path.join("uploads", content_id)
+        os.makedirs(upload_dir, exist_ok=True)
+        dest_path = os.path.join(upload_dir, file.filename)
+        try:
+            # Write whole file (Render ephemeral disk is fine for processing)
+            content_bytes = await file.read()
+            async with aiofiles.open(dest_path, 'wb') as out:
+                await out.write(content_bytes)
+        except Exception as io_err:
+            raise HTTPException(status_code=500, detail=f"Failed to save uploaded file: {io_err}")
         
         # Create content item
         content_item = ContentItem(
@@ -279,7 +292,7 @@ async def upload_content_file(
             user_id=current_user.id,
             title=title or file.filename or "Uploaded File",
             content_type=content_type,
-            file_path=f"uploads/{content_id}/{file.filename}",
+            file_path=dest_path,
             file_size_bytes=file.size,
             processing_status="pending",
             processing_progress=0.0,
@@ -584,6 +597,36 @@ def _split_into_chunks(text: str, max_chars: int = 1800):
     return [c for c in chunks if c]
 
 
+def _markdown_to_text(md: str) -> str:
+    """Convert lightweight Markdown to plain text for chunk storage.
+    Avoid heavy deps; handle common cases: links, images, code blocks, headings, lists.
+    """
+    if not md:
+        return ""
+    text = md
+    # Remove code blocks and inline code
+    text = re.sub(r"```[\s\S]*?```", " ", text)
+    text = re.sub(r"`([^`]+)`", r"\1", text)
+    # Images ![alt](url) -> alt
+    text = re.sub(r"!\[([^\]]*)\]\([^\)]*\)", r"\1", text)
+    # Links [text](url) -> text
+    text = re.sub(r"\[([^\]]+)\]\(([^\)]+)\)", r"\1", text)
+    # Strip remaining standalone []() artifacts
+    text = text.replace("[ ]", " ")
+    text = re.sub(r"\[(.*?)\]", r"\1", text)
+    text = re.sub(r"\((https?://[^)]+)\)", r"\1", text)
+    # Headings and list markers
+    text = re.sub(r"^\s{0,3}#{1,6}\s*", "", text, flags=re.MULTILINE)
+    text = re.sub(r"^\s*[-*+]\s+", "", text, flags=re.MULTILINE)
+    text = re.sub(r"^\s*\d+\.\s+", "", text, flags=re.MULTILINE)
+    # Collapse excessive whitespace
+    text = re.sub(r"\r\n|\r", "\n", text)
+    text = re.sub(r"\n{3,}", "\n\n", text)
+    text = re.sub(r"[\t\u00A0]+", " ", text)
+    text = re.sub(r" {2,}", " ", text)
+    return text.strip()
+
+
 def _save_chunks_for_item(db: Session, item: ContentItem, processed_content: str):
     """Persist processed content into ContentChunk rows even if vector DB is unavailable."""
     if not processed_content:
@@ -596,7 +639,8 @@ def _save_chunks_for_item(db: Session, item: ContentItem, processed_content: str
             db.delete(ch)
         db.flush()
 
-    pieces = _split_into_chunks(processed_content)
+    clean = _markdown_to_text(processed_content)
+    pieces = _split_into_chunks(clean)
     for idx, piece in enumerate(pieces):
         chunk = ContentChunk(
             chunk_id=f"chunk_{item.content_id}_{idx}",
