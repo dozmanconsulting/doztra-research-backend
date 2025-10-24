@@ -190,6 +190,21 @@ class YouTubeProcessor:
             if isinstance(transcript, Exception):
                 transcript = {"error": str(transcript)}
             
+            # Fallback: if YouTube Data API is unavailable, scrape OG tags directly from page
+            if metadata.get("error"):
+                try:
+                    og = await self._fetch_og_from_page(url)
+                    if og:
+                        metadata = {
+                            "video_id": video_id,
+                            "title": og.get("og:title", ""),
+                            "description": og.get("og:description", ""),
+                            "channel_title": og.get("og:site_name", ""),
+                            "thumbnail_url": og.get("og:image", ""),
+                        }
+                except Exception as e:
+                    logger.warning(f"OG fallback failed for {url}: {e}")
+
             # Combine results
             result = {
                 "video_id": video_id,
@@ -201,13 +216,14 @@ class YouTubeProcessor:
             
             # Extract content for knowledge base
             content = ""
-            if not transcript.get("error"):
+            if transcript and not transcript.get("error"):
                 content = transcript.get("full_transcript", "")
             
-            if not metadata.get("error"):
-                title = metadata.get("title", "")
-                description = metadata.get("description", "")
-                content = f"Title: {title}\n\nDescription: {description}\n\nTranscript:\n{content}"
+            if metadata and not metadata.get("error"):
+                title = metadata.get("title", "") or ""
+                description = metadata.get("description", "") or ""
+                # Always include title/description even if transcript is empty
+                content = f"Title: {title}\n\nDescription: {description}\n\nTranscript:\n{content}".strip()
             
             result["extracted_content"] = content
             result["content_length"] = len(content)
@@ -345,3 +361,5 @@ class YouTubeProcessor:
 
 # Global service instance
 youtube_processor = YouTubeProcessor()
+
+    
