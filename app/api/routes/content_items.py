@@ -252,6 +252,7 @@ async def delete_content_item(
 async def upload_content_file(
     file: UploadFile = File(...),
     title: Optional[str] = None,
+    background_tasks: BackgroundTasks = None,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -291,11 +292,25 @@ async def upload_content_file(
         db.add(content_item)
         db.commit()
         db.refresh(content_item)
-        
+
+        # Auto-start background processing for documents/files
+        if background_tasks is not None:
+            background_tasks.add_task(
+                process_content_background,
+                content_id,
+                str(current_user.id),
+                content_type if content_type else "file",
+            )
+            # Mark as processing
+            content_item.processing_status = "processing"
+            content_item.processing_progress = 0.1
+            content_item.updated_at = datetime.utcnow()
+            db.commit()
+
         return {
             "message": "File uploaded successfully",
             "content_id": content_id,
-            "status": "pending"
+            "status": content_item.processing_status
         }
         
     except Exception as e:
