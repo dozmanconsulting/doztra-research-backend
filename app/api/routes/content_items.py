@@ -339,13 +339,34 @@ async def process_content_item(
         if not item:
             raise HTTPException(status_code=404, detail="Content item not found")
         
-        # Add background processing task
-        background_tasks.add_task(
-            process_content_background,
-            content_id,
-            str(current_user.id),
-            item.content_type
-        )
+        # Route to appropriate background task based on content type
+        if item.content_type in ("url", "youtube"):
+            url = item.source_url or item.content_metadata.get("source_url") or item.content_metadata.get("url")
+            if not url:
+                raise HTTPException(status_code=400, detail="No source URL found for this item")
+            background_tasks.add_task(
+                process_url_background,
+                content_id,
+                url,
+                str(current_user.id),
+                item.content_type,
+            )
+        elif item.content_type in ("audio",):
+            if not item.file_path:
+                raise HTTPException(status_code=400, detail="No file path found for audio item")
+            background_tasks.add_task(
+                transcribe_audio_background,
+                content_id,
+                item.file_path,
+                str(current_user.id),
+            )
+        else:
+            background_tasks.add_task(
+                process_content_background,
+                content_id,
+                str(current_user.id),
+                item.content_type,
+            )
         
         # Update status to processing
         item.processing_status = "processing"
@@ -642,7 +663,7 @@ async def process_content_background(content_id: str, user_id: str, content_type
         processed_content = ""
         
         # Process based on content type
-        if content_type == "file" and item.file_path:
+        if content_type in ("file", "pdf", "document") and item.file_path:
             # Process document
             result = await document_processor.process_document(item.file_path)
             if result.get("success"):
@@ -728,6 +749,32 @@ async def get_item_chunks(
         ],
         "total_chunks": db.query(ContentChunk).filter(ContentChunk.content_item_id == item.id).count(),
     }
+
+
+@router.delete("/items/{content_id}/chunks")
+async def delete_item_chunks(
+    content_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Delete all stored chunks for a specific content item.
+    Leaves the content item itself intact so it can be reprocessed later.
+    """
+    item = db.query(ContentItem).filter(
+        ContentItem.content_id == content_id,
+        ContentItem.user_id == current_user.id
+    ).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Content item not found")
+
+    # Count and delete chunks
+    q = db.query(ContentChunk).filter(ContentChunk.content_item_id == item.id)
+    total = q.count()
+    for ch in q.all():
+        db.delete(ch)
+    db.commit()
+
+    return {"content_id": content_id, "deleted_chunks": total}
 
 
 @router.get("/context")
