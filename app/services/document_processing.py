@@ -10,13 +10,24 @@ import logging
 from pathlib import Path
 import mimetypes
 
-# Document processing libraries
+# Document processing libraries (core Python)
 import csv
 import json
 import xml.etree.ElementTree as ET
 import zipfile
-import markdown
-import yaml
+
+# Optional document libraries
+try:
+    import markdown
+    MARKDOWN_AVAILABLE = True
+except ImportError:
+    MARKDOWN_AVAILABLE = False
+
+try:
+    import yaml
+    YAML_AVAILABLE = True
+except ImportError:
+    YAML_AVAILABLE = False
 
 # Optional document libraries
 try:
