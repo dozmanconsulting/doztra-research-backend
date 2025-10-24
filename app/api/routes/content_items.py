@@ -64,8 +64,8 @@ async def create_content_item(
             user_id=current_user.id,
             title=request.title,
             content_type=request.content_type,
-            url=request.url,
-            status="pending",
+            source_url=request.url,
+            processing_status="pending",
             processing_progress=0.0,
             content_metadata=request.content_metadata or {},
             extraction_settings=request.extraction_settings or {},
@@ -77,7 +77,7 @@ async def create_content_item(
         # If text content provided, calculate word count
         if request.content:
             content_item.word_count = len(request.content.split())
-            content_item.status = "completed"
+            content_item.processing_status = "completed"
             content_item.processing_progress = 1.0
             content_item.processed_at = datetime.utcnow()
         
@@ -91,7 +91,7 @@ async def create_content_item(
             user_id=str(content_item.user_id),
             title=content_item.title,
             content_type=content_item.content_type,
-            status=content_item.status,
+            status=content_item.processing_status,
             processing_progress=content_item.processing_progress,
             word_count=content_item.word_count,
             file_size_bytes=content_item.file_size_bytes,
@@ -127,7 +127,7 @@ async def get_content_items(
         if content_type:
             items_query = items_query.filter(ContentItem.content_type == content_type)
         if status_filter:
-            items_query = items_query.filter(ContentItem.status == status_filter)
+            items_query = items_query.filter(ContentItem.processing_status == status_filter)
         
         total = items_query.count()
         items = items_query.offset(skip).limit(limit).all()
@@ -139,7 +139,7 @@ async def get_content_items(
                 user_id=str(item.user_id),
                 title=item.title,
                 content_type=item.content_type,
-                status=item.status,
+                status=item.processing_status,
                 processing_progress=item.processing_progress,
                 word_count=item.word_count,
                 file_size_bytes=item.file_size_bytes,
@@ -186,7 +186,7 @@ async def get_content_item(
             user_id=str(item.user_id),
             title=item.title,
             content_type=item.content_type,
-            status=item.status,
+            status=item.processing_status,
             processing_progress=item.processing_progress,
             word_count=item.word_count,
             file_size_bytes=item.file_size_bytes,
@@ -268,7 +268,7 @@ async def upload_content_file(
             content_type=content_type,
             file_path=f"uploads/{content_id}/{file.filename}",
             file_size_bytes=file.size,
-            status="pending",
+            processing_status="pending",
             processing_progress=0.0,
             content_metadata={"original_filename": file.filename, "mime_type": file.content_type},
             language="en",

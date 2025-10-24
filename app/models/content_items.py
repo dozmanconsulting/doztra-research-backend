@@ -35,8 +35,8 @@ class ContentItem(Base):
     file_size_bytes = Column(Integer, nullable=True)
     language = Column(String(10), default="en")
     
-    # Metadata and settings
-    content_metadata = Column(JSON, default={})
+    # Metadata and settings  
+    content_metadata = Column("metadata", JSON, default={})  # Map to existing 'metadata' column
     extraction_settings = Column(JSON, default={})
     
     # Timestamps
@@ -68,7 +68,7 @@ class ContentChunk(Base):
     embedding_model = Column(String(100), nullable=True)
     
     # Chunk metadata
-    chunk_metadata = Column(JSON, default={})
+    chunk_metadata = Column("metadata", JSON, default={})  # Map to existing 'metadata' column
     word_count = Column(Integer, nullable=True)
     
     # Timestamps

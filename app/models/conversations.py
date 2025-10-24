@@ -27,7 +27,7 @@ class ConversationSession(Base):
     total_tokens_used = Column(Integer, default=0)
     
     # Session settings and metadata
-    session_metadata = Column(JSON, default={})
+    session_metadata = Column("metadata", JSON, default={})  # Map to existing 'metadata' column
     settings = Column(JSON, default={})
     
     # Timestamps
@@ -58,7 +58,7 @@ class MessageFeedback(Base):
     feedback_type = Column(String(50), nullable=True)  # helpful, accurate, relevant, etc.
     
     # Feedback metadata
-    feedback_metadata = Column(JSON, default={})
+    feedback_metadata = Column("metadata", JSON, default={})  # Map to existing 'metadata' column
     
     # Timestamps
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
@@ -121,7 +121,7 @@ class ConversationExport(Base):
     
     # Export settings
     include_sources = Column(Boolean, default=True)
-    include_export_metadata = Column(Boolean, default=False)
+    include_metadata = Column(Boolean, default=False)  # Use original column name
     export_settings = Column(JSON, default={})
     
     # Export status
