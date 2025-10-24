@@ -56,7 +56,7 @@ class User(Base):
     refresh_tokens = relationship("RefreshToken", back_populates="user", cascade="all, delete-orphan")
     research_projects = relationship("ResearchProject", back_populates="user", cascade="all, delete-orphan")
     documents = relationship("Document", back_populates="user", cascade="all, delete-orphan")
-    document_queries = relationship("DocumentQuery", back_populates="user", cascade="all, delete-orphan")
+    # document_queries = relationship("DocumentQuery", back_populates="user", cascade="all, delete-orphan")  # Model doesn't exist
     token_usage = relationship("TokenUsage", back_populates="user", cascade="all, delete-orphan")
     user_preferences = relationship("UserPreferences", back_populates="user", uselist=False, cascade="all, delete-orphan")
     chat_conversations = relationship("ChatConversation", back_populates="user", cascade="all, delete-orphan")
