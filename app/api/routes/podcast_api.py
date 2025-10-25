@@ -33,6 +33,7 @@ Simple CRUD endpoints for podcasts matching test expectations.
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
+from sqlalchemy import or_
 from typing import List, Optional, Dict, Any
 import uuid
 from datetime import datetime
@@ -127,16 +128,27 @@ async def create_and_generate_podcast(
         try:
             texts: List[str] = []
             if request.source_ids:
-                items = (
-                    db.query(ContentItem)
-                    .filter(ContentItem.user_id == current_user.id, ContentItem.content_id.in_(request.source_ids))
-                    .all()
-                )
+                cid_like = [sid for sid in request.source_ids if isinstance(sid, str) and not sid.count('-') == 4]
+                uuid_like = []
+                for sid in request.source_ids:
+                    try:
+                        import uuid as _uuid
+                        uuid_like.append(_uuid.UUID(str(sid)))
+                    except Exception:
+                        continue
+                q = db.query(ContentItem).filter(ContentItem.user_id == current_user.id)
+                if cid_like and uuid_like:
+                    q = q.filter(or_(ContentItem.content_id.in_(cid_like), ContentItem.id.in_(uuid_like)))
+                elif cid_like:
+                    q = q.filter(ContentItem.content_id.in_(cid_like))
+                elif uuid_like:
+                    q = q.filter(ContentItem.id.in_(uuid_like))
+                items = q.all()
                 if items:
                     chunks = (
                         db.query(ContentChunk)
                         .join(ContentItem, ContentChunk.content_item_id == ContentItem.id)
-                        .filter(ContentItem.user_id == current_user.id, ContentItem.content_id.in_(request.source_ids))
+                        .filter(ContentItem.user_id == current_user.id, ContentItem.id.in_([it.id for it in items]))
                         .order_by(ContentChunk.chunk_index.asc())
                         .limit(12)
                         .all()
@@ -160,10 +172,12 @@ async def create_and_generate_podcast(
             podcast.script_content = script
             podcast.status = "completed"
             podcast.completed_at = datetime.utcnow()
+        except Exception as e:
+            podcast.status = "failed"
+            podcast.error_message = str(e)[:500]
+        finally:
             db.commit()
             db.refresh(podcast)
-        except Exception:
-            pass
 
         return PodcastResponse(**_serialize_podcast(podcast))
     except Exception as e:
