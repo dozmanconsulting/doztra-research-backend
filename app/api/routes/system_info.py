@@ -65,9 +65,25 @@ async def get_system_capabilities() -> Dict[str, Any]:
     except ImportError:
         libraries_available["milvus"] = False
     
+    # Detect pinecone SDK (optional)
+    try:
+        import pinecone  # type: ignore
+        libraries_available["pinecone"] = True
+    except Exception:
+        libraries_available["pinecone"] = False
+    
     # Database connectivity
     database_available = True  # If we got here, DB is working
     
+    # Vector backend selection
+    backend = os.getenv("VECTOR_BACKEND", "milvus").lower()
+    if backend == "pinecone":
+        vector_available = libraries_available.get("pinecone", False) and bool(os.getenv("PINECONE_API_KEY"))
+        vector_provider = "Pinecone"
+    else:
+        vector_available = libraries_available.get("milvus", False)
+        vector_provider = "Zilliz Cloud" if os.getenv("MILVUS_USE_SECURE") == "true" else "Local Milvus"
+
     return {
         "success": True,
         "capabilities": {
@@ -77,8 +93,9 @@ async def get_system_capabilities() -> Dict[str, Any]:
                 "total_available": len([k for k, v in libraries_available.items() if v])
             },
             "vector_search": {
-                "available": libraries_available.get("milvus", False),
-                "provider": "Zilliz Cloud" if os.getenv("MILVUS_USE_SECURE") == "true" else "Local Milvus"
+                "available": vector_available,
+                "provider": vector_provider,
+                "backend": backend
             },
             "api_integrations": api_keys_available,
             "database": {

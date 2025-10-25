@@ -28,15 +28,31 @@ try:
 except ImportError:
     EMBEDDINGS_AVAILABLE = False
 
+# Pinecone SDK availability (new v5 and legacy client)
+PINECONE_V5_AVAILABLE = False
+PINECONE_LEGACY_AVAILABLE = False
+try:  # Preferred new SDK
+    from pinecone import Pinecone as PineconeClient
+    from pinecone import ServerlessSpec as PineconeServerlessSpec
+    PINECONE_V5_AVAILABLE = True
+except Exception:
+    try:  # Legacy SDK
+        import pinecone as pinecone_legacy
+        PINECONE_LEGACY_AVAILABLE = True
+    except Exception:
+        pass
+
 logger = logging.getLogger(__name__)
 
 class MilvusVectorService:
     def __init__(self):
-        self.host = os.getenv("MILVUS_HOST", "localhost")
-        self.port = int(os.getenv("MILVUS_PORT", "19530"))
+        # Fall back to defaults if env vars are unset or blank
+        self.host = os.getenv("MILVUS_HOST") or "localhost"
+        self.port = int(os.getenv("MILVUS_PORT") or "19530")
         self.user = os.getenv("MILVUS_USER")
         self.password = os.getenv("MILVUS_PASSWORD")
         self.use_secure = os.getenv("MILVUS_USE_SECURE", "false").lower() == "true"
+        self.db_name = os.getenv("MILVUS_DB_NAME") or "default"
         self.collection_name = "knowledge_base_vectors"
         self.dimension = 768  # Default for sentence-transformers
         self.connected = False
@@ -65,23 +81,20 @@ class MilvusVectorService:
             return False
         
         try:
-            # Prepare connection parameters
-            connection_params = {
-                "alias": "default",
-                "host": self.host,
-                "port": self.port
-            }
-            
-            # Add authentication for Zilliz Cloud
-            if self.user and self.password:
-                connection_params["user"] = self.user
-                connection_params["password"] = self.password
-            
-            # Add secure connection for Zilliz Cloud
-            if self.use_secure:
-                connection_params["secure"] = True
-            
-            connections.connect(**connection_params)
+            # Prefer URI + token if provided (best for Zilliz Cloud Serverless)
+            env_uri = os.getenv("MILVUS_URI")
+            env_token = os.getenv("MILVUS_TOKEN")
+            if env_uri:
+                connections.connect(alias="default", uri=env_uri, token=env_token, db_name=self.db_name)
+            else:
+                # Build URI automatically when secure=true (Zilliz)
+                if self.use_secure:
+                    uri = f"https://{self.host}:{self.port}"
+                    token = env_token or (f"{self.user}:{self.password}" if self.user and self.password else None)
+                    connections.connect(alias="default", uri=uri, token=token, db_name=self.db_name)
+                else:
+                    # Local Milvus host/port
+                    connections.connect(alias="default", host=self.host, port=self.port, db_name=self.db_name)
             self.connected = True
             
             connection_type = "Zilliz Cloud" if self.use_secure else "Local Milvus"
@@ -93,6 +106,189 @@ class MilvusVectorService:
             
         except Exception as e:
             logger.error(f"Failed to connect to Milvus: {e}")
+            return False
+
+
+class PineconeVectorService:
+    """Pinecone vector backend with optional serverless index creation.
+    Requires env:
+      - PINECONE_API_KEY
+      - PINECONE_INDEX (e.g., knowledge-base)
+      - PINECONE_CLOUD (aws|gcp) and PINECONE_REGION (e.g., us-east-1) for new SDK serverless
+      - or PINECONE_ENVIRONMENT for legacy SDK
+    """
+    def __init__(self):
+        self.api_key = os.getenv("PINECONE_API_KEY")
+        self.index_name = os.getenv("PINECONE_INDEX", "knowledge-base")
+        self.cloud = os.getenv("PINECONE_CLOUD", "aws")
+        self.region = os.getenv("PINECONE_REGION", "us-east-1")
+        self.dimension = 384  # default to MiniLM; will update on model load
+        self.index = None
+        self.connected = False
+        self.collection_name = "knowledge_base_vectors"
+
+        # Embeddings
+        self.embedding_model = None
+        self.openai_api_key = os.getenv("OPENAI_API_KEY")
+        self.openai_client = None
+        if EMBEDDINGS_AVAILABLE:
+            try:
+                self.embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
+                self.dimension = 384
+                logger.info("Loaded sentence-transformers model for Pinecone")
+            except Exception as e:
+                logger.warning(f"Failed to load sentence-transformers: {e}")
+        # Fallback to OpenAI client if sentence-transformers not available/loaded
+        if self.openai_api_key and self.embedding_model is None:
+            try:
+                from openai import OpenAI
+                self.openai_client = OpenAI(api_key=self.openai_api_key)
+                self.dimension = 1536  # text-embedding-3-small
+                logger.info("Using OpenAI embeddings for Pinecone (text-embedding-3-small)")
+            except Exception as oe:
+                logger.error(f"Failed to init OpenAI client: {oe}")
+
+    async def connect(self) -> bool:
+        if not self.api_key:
+            logger.error("Pinecone API key not set")
+            return False
+        try:
+            if PINECONE_V5_AVAILABLE:
+                pc = PineconeClient(api_key=self.api_key)
+                existing = [idx.name for idx in pc.list_indexes()]
+                if self.index_name not in existing:
+                    pc.create_index(
+                        name=self.index_name,
+                        dimension=self.dimension,
+                        metric="cosine",
+                        spec=PineconeServerlessSpec(cloud=self.cloud, region=self.region),
+                    )
+                self.index = pc.Index(self.index_name)
+                logger.info(f"Connected to Pinecone v5 index {self.index_name}")
+                self.connected = True
+                return True
+            elif PINECONE_LEGACY_AVAILABLE:
+                # Legacy client expects environment instead of cloud/region
+                env = os.getenv("PINECONE_ENVIRONMENT", f"{self.region}-{self.cloud}")
+                pinecone_legacy.init(api_key=self.api_key, environment=env)
+                if self.index_name not in pinecone_legacy.list_indexes():
+                    pinecone_legacy.create_index(self.index_name, dimension=self.dimension, metric="cosine")
+                self.index = pinecone_legacy.Index(self.index_name)
+                logger.info(f"Connected to Pinecone legacy index {self.index_name}")
+                self.connected = True
+                return True
+            else:
+                logger.error("Pinecone SDK not installed. Run: pip install pinecone or pinecone-client")
+                return False
+        except Exception as e:
+            logger.error(f"Failed to connect/create Pinecone index: {e}")
+            self.connected = False
+            return False
+
+    async def generate_embeddings(self, texts):
+        if self.embedding_model:
+            return self.embedding_model.encode(texts).tolist()
+        elif self.openai_client:
+            resp = self.openai_client.embeddings.create(model="text-embedding-3-small", input=texts)
+            return [d.embedding for d in resp.data]
+        else:
+            raise Exception("No embedding model available for Pinecone")
+
+    def chunk_text(self, text: str, chunk_size: int = 500, overlap: int = 50):
+        words = text.split()
+        chunks = []
+        for i in range(0, len(words), chunk_size - overlap):
+            chunk = "".join([" ".join(words[i:i + chunk_size])])
+            if chunk.strip():
+                chunks.append(chunk)
+        return chunks
+
+    async def add_content(self, content_id, user_id, content_type, title, content, metadata=None) -> bool:
+        if not self.index:
+            ok = await self.connect()
+            if not ok:
+                return False
+        try:
+            chunks = self.chunk_text(content)
+            if not chunks:
+                return False
+            embeddings = await self.generate_embeddings(chunks)
+            vectors = []
+            for i, (chunk, emb) in enumerate(zip(chunks, embeddings)):
+                meta = {
+                    "content_id": content_id,
+                    "user_id": user_id,
+                    "content_type": content_type,
+                    "title": title,
+                    "chunk_index": i,
+                }
+                if metadata:
+                    meta.update(metadata)
+                vec_id = f"{content_id}:{i}"
+                vectors.append({"id": vec_id, "values": emb, "metadata": meta})
+            # Upsert
+            namespace = str(user_id)
+            if PINECONE_V5_AVAILABLE:
+                self.index.upsert(vectors=vectors, namespace=namespace)
+            else:
+                self.index.upsert(vectors=vectors, namespace=namespace)
+            return True
+        except Exception as e:
+            logger.error(f"Failed to upsert to Pinecone: {e}")
+            return False
+
+    async def search_similar(self, query, user_id, limit=10, content_type=None, score_threshold=0.7):
+        if not self.index:
+            ok = await self.connect()
+            if not ok:
+                return []
+        try:
+            q_emb = (await self.generate_embeddings([query]))[0]
+            namespace = str(user_id)
+            if PINECONE_V5_AVAILABLE:
+                res = self.index.query(vector=q_emb, top_k=limit, include_metadata=True, namespace=namespace)
+                matches = res.get("matches", []) if isinstance(res, dict) else res.matches
+            else:
+                res = self.index.query(vector=q_emb, top_k=limit, include_metadata=True, namespace=namespace)
+                matches = res.get("matches", []) if isinstance(res, dict) else res.matches
+            results = []
+            for m in matches or []:
+                score = m.get("score") if isinstance(m, dict) else m.score
+                meta = m.get("metadata") if isinstance(m, dict) else getattr(m, "metadata", {})
+                if score is None or (score_threshold and score < score_threshold):
+                    continue
+                results.append({
+                    "content_id": meta.get("content_id"),
+                    "title": meta.get("title"),
+                    "content": None,  # we don't store chunk text by default
+                    "content_type": meta.get("content_type"),
+                    "chunk_index": meta.get("chunk_index"),
+                    "similarity_score": score,
+                    "metadata": meta or {},
+                })
+            return results
+        except Exception as e:
+            logger.error(f"Pinecone search failed: {e}")
+            return []
+
+    async def delete_content(self, content_id: str, user_id: str) -> bool:
+        if not self.index:
+            ok = await self.connect()
+            if not ok:
+                return False
+        try:
+            namespace = str(user_id)
+            # Prefer filter deletion if supported
+            try:
+                self.index.delete(filter={"content_id": content_id}, namespace=namespace)
+                return True
+            except Exception:
+                # Fallback: delete ids by prefix (requires listing ids – not available in v5 easily)
+                # As a fallback, do nothing and report False
+                logger.warning("Pinecone delete by filter not supported on this SDK; manual cleanup may be needed")
+                return False
+        except Exception as e:
+            logger.error(f"Pinecone delete failed: {e}")
             return False
     
     async def _create_collection(self):
@@ -426,5 +622,143 @@ class MilvusVectorService:
             logger.error(f"Failed to perform hybrid search: {e}")
             return []
 
-# Global service instance
-vector_service = MilvusVectorService()
+# Clean re-definition of Pinecone service to avoid accidental overrides above
+class PineconeVectorService:  # noqa: F811 (intentional redefinition)
+    def __init__(self):
+        self.api_key = os.getenv("PINECONE_API_KEY")
+        self.index_name = os.getenv("PINECONE_INDEX", "knowledge-base")
+        self.cloud = os.getenv("PINECONE_CLOUD", "aws")
+        self.region = os.getenv("PINECONE_REGION", "us-east-1")
+        self.index = None
+        self.connected = False
+        # Embeddings
+        self.embedding_model = None
+        self.openai_client = None
+        self.dimension = 384
+        # Prefer sentence-transformers if available
+        try:
+            from sentence_transformers import SentenceTransformer as _ST
+            self.embedding_model = _ST('all-MiniLM-L6-v2')
+            self.dimension = 384
+        except Exception:
+            api_key = os.getenv("OPENAI_API_KEY")
+            if api_key:
+                try:
+                    from openai import OpenAI as _OpenAI
+                    self.openai_client = _OpenAI(api_key=api_key)
+                    self.dimension = 1536  # text-embedding-3-small
+                except Exception:
+                    self.openai_client = None
+
+    async def connect(self) -> bool:
+        if not self.api_key:
+            return False
+        try:
+            if PINECONE_V5_AVAILABLE:
+                pc = PineconeClient(api_key=self.api_key)
+                names = [idx.name for idx in pc.list_indexes()]
+                if self.index_name not in names:
+                    pc.create_index(
+                        name=self.index_name,
+                        dimension=self.dimension,
+                        metric="cosine",
+                        spec=PineconeServerlessSpec(cloud=self.cloud, region=self.region),
+                    )
+                self.index = pc.Index(self.index_name)
+                self.connected = True
+                return True
+            elif PINECONE_LEGACY_AVAILABLE:
+                env = os.getenv("PINECONE_ENVIRONMENT", f"{self.region}-{self.cloud}")
+                pinecone_legacy.init(api_key=self.api_key, environment=env)
+                if self.index_name not in pinecone_legacy.list_indexes():
+                    pinecone_legacy.create_index(self.index_name, dimension=self.dimension, metric="cosine")
+                self.index = pinecone_legacy.Index(self.index_name)
+                self.connected = True
+                return True
+            return False
+        except Exception:
+            self.connected = False
+            return False
+
+    async def _emb(self, texts):
+        if self.embedding_model is not None:
+            return self.embedding_model.encode(texts).tolist()
+        if self.openai_client is not None:
+            resp = self.openai_client.embeddings.create(model="text-embedding-3-small", input=texts)
+            return [d.embedding for d in resp.data]
+        raise RuntimeError("Embedding models not available")
+
+    def _chunks(self, text: str, chunk_size: int = 500, overlap: int = 50):
+        words = text.split()
+        chunks = []
+        for i in range(0, len(words), chunk_size - overlap):
+            part = " ".join(words[i:i + chunk_size]).strip()
+            if part:
+                chunks.append(part)
+        return chunks
+
+    async def add_content(self, content_id, user_id, content_type, title, content, metadata=None) -> bool:
+        if not self.connected:
+            ok = await self.connect()
+            if not ok:
+                return False
+        try:
+            chunks = self._chunks(content)
+            if not chunks:
+                return False
+            embs = await self._emb(chunks)
+            namespace = str(user_id)
+            vectors = []
+            for i, (chunk, emb) in enumerate(zip(chunks, embs)):
+                meta = {"content_id": content_id, "user_id": user_id, "content_type": content_type, "title": title, "chunk_index": i}
+                if metadata:
+                    meta.update(metadata)
+                vectors.append({"id": f"{content_id}:{i}", "values": emb, "metadata": meta})
+            self.index.upsert(vectors=vectors, namespace=namespace)
+            return True
+        except Exception:
+            return False
+
+    async def search_similar(self, query, user_id, limit=10, content_type=None, score_threshold=0.0):
+        if not self.connected:
+            ok = await self.connect()
+            if not ok:
+                return []
+        try:
+            q = (await self._emb([query]))[0]
+            res = self.index.query(vector=q, top_k=limit, include_metadata=True, namespace=str(user_id))
+            matches = res.get("matches", []) if isinstance(res, dict) else getattr(res, "matches", [])
+            out = []
+            for m in matches or []:
+                score = m.get("score") if isinstance(m, dict) else getattr(m, "score", None)
+                meta = m.get("metadata") if isinstance(m, dict) else getattr(m, "metadata", {})
+                if score is None or score < score_threshold:
+                    continue
+                out.append({
+                    "content_id": meta.get("content_id"),
+                    "title": meta.get("title"),
+                    "content": None,
+                    "content_type": meta.get("content_type"),
+                    "chunk_index": meta.get("chunk_index"),
+                    "similarity_score": score,
+                    "metadata": meta or {},
+                })
+            return out
+        except Exception:
+            return []
+
+    async def delete_content(self, content_id: str, user_id: str) -> bool:
+        # Best-effort delete by filter if supported; otherwise skip
+        try:
+            self.index.delete(filter={"content_id": content_id}, namespace=str(user_id))
+            return True
+        except Exception:
+            return True
+
+
+# Global service instance (switchable)
+_backend = os.getenv("VECTOR_BACKEND", "milvus").lower()
+if _backend == "pinecone":
+    vector_service = PineconeVectorService()
+else:
+    vector_service = MilvusVectorService()
