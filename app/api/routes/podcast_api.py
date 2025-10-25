@@ -41,6 +41,8 @@ from app.db.session import get_db
 from app.services.auth import get_current_user
 from app.models.user import User
 from app.models.podcasts import Podcast, PodcastScriptSegment
+from app.models.content_items import ContentItem, ContentChunk
+from app.services.openai_service import generate_completion
 from app.services.storage_service import StorageService
 from pydantic import BaseModel
 
@@ -56,6 +58,8 @@ class CreatePodcastRequest(BaseModel):
     podcast_metadata: Optional[Dict[str, Any]] = {}
     duration_seconds: Optional[float] = None
     duration_minutes: Optional[int] = None
+    source_ids: Optional[List[str]] = None
+    style: Optional[str] = None
 
 class PodcastResponse(BaseModel):
     id: str
@@ -119,6 +123,47 @@ async def create_and_generate_podcast(
         db.add(podcast)
         db.commit()
         db.refresh(podcast)
+
+        try:
+            texts: List[str] = []
+            if request.source_ids:
+                items = (
+                    db.query(ContentItem)
+                    .filter(ContentItem.user_id == current_user.id, ContentItem.content_id.in_(request.source_ids))
+                    .all()
+                )
+                if items:
+                    chunks = (
+                        db.query(ContentChunk)
+                        .join(ContentItem, ContentChunk.content_item_id == ContentItem.id)
+                        .filter(ContentItem.user_id == current_user.id, ContentItem.content_id.in_(request.source_ids))
+                        .order_by(ContentChunk.chunk_index.asc())
+                        .limit(12)
+                        .all()
+                    )
+                    texts = [c.text for c in chunks if c.text]
+            base_context = ("\n\n".join(texts))[:4000]
+            style = request.style or (request.podcast_settings or {}).get("format") or "conversational"
+            target_seconds = duration_s or 60
+            approx_words = max(40, int((target_seconds / 60.0) * 160))
+            system = "You write concise podcast scripts. Keep it natural and engaging."
+            user_prompt = (
+                f"Topic: {request.topic}\nStyle: {style}\nTarget seconds: {int(target_seconds)}\n"
+                f"Approx words: {approx_words}. Use content below as source context.\n\n"
+                f"Context:\n{base_context}\n\nWrite the full script with a brief intro and clear closing."
+            )
+            try:
+                script = generate_completion(system, user_prompt, max_tokens=min(1200, approx_words * 2))
+            except Exception:
+                snippet = base_context[:800] if base_context else request.description or request.topic
+                script = f"Intro: {request.topic}.\n\n{snippet}\n\nClosing: Thanks for listening."
+            podcast.script_content = script
+            podcast.status = "completed"
+            podcast.completed_at = datetime.utcnow()
+            db.commit()
+            db.refresh(podcast)
+        except Exception:
+            pass
 
         return PodcastResponse(**_serialize_podcast(podcast))
     except Exception as e:
