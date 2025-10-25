@@ -168,7 +168,57 @@ class YouTubeProcessor:
         except Exception as e:
             logger.error(f"Failed to get transcript for video {video_id}: {e}")
             return {"error": str(e)}
-    
+
+    async def _fetch_og_from_page(self, url: str) -> Dict[str, Any]:
+        """Fetch Open Graph metadata directly from the video page as a fallback.
+        Returns a dict with keys like og:title, og:description, og:site_name, og:image.
+        """
+        try:
+            headers = {
+                "User-Agent": (
+                    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) "
+                    "Chrome/120.0.0.0 Safari/537.36"
+                ),
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                "Accept-Language": "en-US,en;q=0.9",
+            }
+            timeout = aiohttp.ClientTimeout(total=15)
+            async with aiohttp.ClientSession(timeout=timeout, headers=headers) as session:
+                async with session.get(url) as resp:
+                    html = await resp.text(errors="ignore")
+
+            # Try BeautifulSoup first if available
+            try:
+                from bs4 import BeautifulSoup  # type: ignore
+                soup = BeautifulSoup(html, "html.parser")
+                og = {}
+                for tag in soup.find_all("meta"):
+                    prop = tag.get("property") or tag.get("name")
+                    if not prop:
+                        continue
+                    if prop.startswith("og:"):
+                        og[prop] = tag.get("content", "")
+                # Normalize a few common keys
+                return og
+            except Exception:
+                # Lightweight regex fallback
+                import re
+                def find(name: str) -> str:
+                    m = re.search(rf'<meta[^>]+property=["\']{name}["\'][^>]*content=["\']([^"\']*)["\']', html, re.I)
+                    if not m:
+                        m = re.search(rf'<meta[^>]+name=["\']{name}["\'][^>]*content=["\']([^"\']*)["\']', html, re.I)
+                    return m.group(1) if m else ""
+                return {
+                    "og:title": find("og:title"),
+                    "og:description": find("og:description"),
+                    "og:site_name": find("og:site_name"),
+                    "og:image": find("og:image"),
+                }
+        except Exception as e:
+            logger.debug(f"Failed OG scrape for {url}: {e}")
+            return {}
+
     async def process_youtube_video(self, url: str) -> Dict[str, Any]:
         """Complete YouTube video processing"""
         video_id = self.extract_video_id(url)
