@@ -1,3 +1,31 @@
+def _serialize_podcast(podcast) -> dict:
+    """Serialize a Podcast ORM object to response dict with signed audio URL if applicable."""
+    storage = StorageService()
+    signed_url = None
+    if podcast.audio_file_path:
+        # Try to generate a signed URL for remote storage
+        signed_url = storage.generate_signed_url(podcast.audio_file_path) or (
+            podcast.audio_file_path if str(podcast.audio_file_path).startswith(("http://", "https://")) else None
+        )
+    return {
+        "id": str(podcast.id),
+        "podcast_id": podcast.podcast_id,
+        "user_id": str(podcast.user_id),
+        "title": podcast.title,
+        "topic": podcast.topic,
+        "description": podcast.description,
+        "status": podcast.status,
+        "duration_seconds": podcast.duration_seconds,
+        "file_size_bytes": podcast.file_size_bytes,
+        "audio_format": podcast.audio_format,
+        "created_at": podcast.created_at,
+        "script_generated_at": podcast.script_generated_at,
+        "audio_generated_at": podcast.audio_generated_at,
+        "completed_at": podcast.completed_at,
+        "audio_file_path": podcast.audio_file_path,
+        "audio_url": signed_url,
+        "script_content": podcast.script_content,
+    }
 """
 Podcasts API Routes
 Simple CRUD endpoints for podcasts matching test expectations.
@@ -13,6 +41,7 @@ from app.db.session import get_db
 from app.services.auth import get_current_user
 from app.models.user import User
 from app.models.podcasts import Podcast, PodcastScriptSegment
+from app.services.storage_service import StorageService
 from pydantic import BaseModel
 
 router = APIRouter(prefix="/api", tags=["Podcasts"])
@@ -41,6 +70,9 @@ class PodcastResponse(BaseModel):
     script_generated_at: Optional[datetime]
     audio_generated_at: Optional[datetime]
     completed_at: Optional[datetime]
+    audio_file_path: Optional[str] = None
+    audio_url: Optional[str] = None
+    script_content: Optional[str] = None
     
     class Config:
         from_attributes = True
@@ -79,22 +111,7 @@ async def create_and_generate_podcast(
         db.commit()
         db.refresh(podcast)
 
-        return PodcastResponse(
-            id=str(podcast.id),
-            podcast_id=podcast.podcast_id,
-            user_id=str(podcast.user_id),
-            title=podcast.title,
-            topic=podcast.topic,
-            description=podcast.description,
-            status=podcast.status,
-            duration_seconds=podcast.duration_seconds,
-            file_size_bytes=podcast.file_size_bytes,
-            audio_format=podcast.audio_format,
-            created_at=podcast.created_at,
-            script_generated_at=podcast.script_generated_at,
-            audio_generated_at=podcast.audio_generated_at,
-            completed_at=podcast.completed_at,
-        )
+        return PodcastResponse(**_serialize_podcast(podcast))
     except Exception as e:
         db.rollback()
         raise HTTPException(
@@ -132,22 +149,7 @@ async def create_podcast(
         db.commit()
         db.refresh(podcast)
         
-        return PodcastResponse(
-            id=str(podcast.id),
-            podcast_id=podcast.podcast_id,
-            user_id=str(podcast.user_id),
-            title=podcast.title,
-            topic=podcast.topic,
-            description=podcast.description,
-            status=podcast.status,
-            duration_seconds=podcast.duration_seconds,
-            file_size_bytes=podcast.file_size_bytes,
-            audio_format=podcast.audio_format,
-            created_at=podcast.created_at,
-            script_generated_at=podcast.script_generated_at,
-            audio_generated_at=podcast.audio_generated_at,
-            completed_at=podcast.completed_at
-        )
+        return PodcastResponse(**_serialize_podcast(podcast))
         
     except Exception as e:
         db.rollback()
@@ -178,25 +180,7 @@ async def get_podcasts(
         total = podcasts_query.count()
         podcasts = podcasts_query.offset(skip).limit(limit).all()
         
-        podcast_responses = [
-            PodcastResponse(
-                id=str(podcast.id),
-                podcast_id=podcast.podcast_id,
-                user_id=str(podcast.user_id),
-                title=podcast.title,
-                topic=podcast.topic,
-                description=podcast.description,
-                status=podcast.status,
-                duration_seconds=podcast.duration_seconds,
-                file_size_bytes=podcast.file_size_bytes,
-                audio_format=podcast.audio_format,
-                created_at=podcast.created_at,
-                script_generated_at=podcast.script_generated_at,
-                audio_generated_at=podcast.audio_generated_at,
-                completed_at=podcast.completed_at
-            )
-            for podcast in podcasts
-        ]
+        podcast_responses = [PodcastResponse(**_serialize_podcast(p)) for p in podcasts]
         
         return PodcastListResponse(
             podcasts=podcast_responses,
@@ -227,23 +211,7 @@ async def get_podcast(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Podcast not found"
             )
-        
-        return PodcastResponse(
-            id=str(podcast.id),
-            podcast_id=podcast.podcast_id,
-            user_id=str(podcast.user_id),
-            title=podcast.title,
-            topic=podcast.topic,
-            description=podcast.description,
-            status=podcast.status,
-            duration_seconds=podcast.duration_seconds,
-            file_size_bytes=podcast.file_size_bytes,
-            audio_format=podcast.audio_format,
-            created_at=podcast.created_at,
-            script_generated_at=podcast.script_generated_at,
-            audio_generated_at=podcast.audio_generated_at,
-            completed_at=podcast.completed_at
-        )
+        return PodcastResponse(**_serialize_podcast(podcast))
         
     except HTTPException:
         raise
@@ -252,6 +220,44 @@ async def get_podcast(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to retrieve podcast: {str(e)}"
         )
+
+@router.get("/podcasts/{podcast_id}/segments")
+async def get_podcast_segments(
+    podcast_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Return script segments and combined text for a podcast owned by the user."""
+    try:
+        podcast = db.query(Podcast).filter(
+            Podcast.podcast_id == podcast_id,
+            Podcast.user_id == current_user.id
+        ).first()
+        if not podcast:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Podcast not found")
+        segs = (
+            db.query(PodcastScriptSegment)
+            .filter(PodcastScriptSegment.podcast_id == podcast.id)
+            .order_by(PodcastScriptSegment.segment_index.asc())
+            .all()
+        )
+        segments_out = [
+            {
+                "segment_index": s.segment_index,
+                "speaker": s.speaker,
+                "text": s.text,
+                "start_time": s.start_time,
+                "end_time": s.end_time,
+                "duration": s.duration,
+            }
+            for s in segs
+        ]
+        combined = "\n\n".join([s.text for s in segs if s.text])
+        return {"segments": segments_out, "combined_text": combined}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve segments: {str(e)}")
 
 @router.delete("/podcasts/{podcast_id}")
 async def delete_podcast(

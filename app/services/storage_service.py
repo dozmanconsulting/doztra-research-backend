@@ -10,6 +10,7 @@ from pathlib import Path
 from fastapi import UploadFile
 from typing import Optional, Dict, Any
 from app.core.config import settings
+from datetime import timedelta
 
 # Configure logger
 logger = logging.getLogger(__name__)
@@ -310,3 +311,32 @@ class StorageService:
                 return True
             except Exception as e:
                 raise Exception(f"Local file delete error: {str(e)}")
+
+    def generate_signed_url(self, file_path: str, expires_seconds: int = 3600) -> Optional[str]:
+        """Generate a temporary signed HTTPS URL for a stored file if remote storage is used."""
+        try:
+            if file_path.startswith("gs://"):
+                if not self._init_gcs_client():
+                    return None
+                parts = file_path.replace("gs://", "").split("/")
+                bucket_name = parts[0]
+                blob_path = "/".join(parts[1:])
+                bucket = self.gcs_client.bucket(bucket_name)
+                blob = bucket.blob(blob_path)
+                url = blob.generate_signed_url(expiration=timedelta(seconds=expires_seconds), method="GET", version="v4")
+                return url
+            if file_path.startswith("s3://") and self.s3_client:
+                parts = file_path.replace("s3://", "").split("/")
+                bucket = parts[0]
+                key = "/".join(parts[1:])
+                url = self.s3_client.generate_presigned_url(
+                    ClientMethod='get_object',
+                    Params={'Bucket': bucket, 'Key': key},
+                    ExpiresIn=expires_seconds,
+                )
+                return url
+            if file_path.startswith("http://") or file_path.startswith("https://"):
+                return file_path
+            return None
+        except Exception:
+            return None
