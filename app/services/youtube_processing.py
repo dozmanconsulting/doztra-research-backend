@@ -32,15 +32,25 @@ class YouTubeProcessor:
     def __init__(self):
         self.youtube_api_key = os.getenv("YOUTUBE_API_KEY")
         self.youtube_service = None
-        
-        if YOUTUBE_API_AVAILABLE and self.youtube_api_key:
-            try:
+        # Do not hard-fail on init; we will lazily initialize on first use
+        self._init_attempted = False
+
+    def _ensure_youtube_service(self) -> None:
+        """Lazily initialize the googleapiclient YouTube service if possible."""
+        if self.youtube_service is not None or self._init_attempted:
+            return
+        self._init_attempted = True
+        try:
+            # Refresh API key in case env was set after process start
+            if not self.youtube_api_key:
+                self.youtube_api_key = os.getenv("YOUTUBE_API_KEY")
+            if YOUTUBE_API_AVAILABLE and self.youtube_api_key:
                 self.youtube_service = googleapiclient.discovery.build(
                     "youtube", "v3", developerKey=self.youtube_api_key
                 )
-                logger.info("YouTube Data API initialized")
-            except Exception as e:
-                logger.warning(f"Failed to initialize YouTube API: {e}")
+                logger.info("YouTube Data API initialized (lazy)")
+        except Exception as e:
+            logger.warning(f"Lazy YouTube API init failed: {e}")
     
     def extract_video_id(self, url: str) -> Optional[str]:
         """Extract YouTube video ID from URL"""
@@ -58,25 +68,66 @@ class YouTubeProcessor:
         return None
     
     async def get_video_metadata(self, video_id: str) -> Dict[str, Any]:
-        """Get video metadata using YouTube Data API"""
-        if not self.youtube_service:
+        """Get video metadata using YouTube Data API with HTTP fallback."""
+        # Try lazy init of google client first
+        self._ensure_youtube_service()
+
+        # Preferred: googleapiclient if available
+        if self.youtube_service is not None:
+            try:
+                request = self.youtube_service.videos().list(
+                    part="snippet,statistics,contentDetails",
+                    id=video_id
+                )
+                response = request.execute()
+                if not response.get("items"):
+                    return {"error": "Video not found"}
+                video = response["items"][0]
+                snippet = video.get("snippet", {})
+                statistics = video.get("statistics", {})
+                content_details = video.get("contentDetails", {})
+                return {
+                    "video_id": video_id,
+                    "title": snippet.get("title", ""),
+                    "description": snippet.get("description", ""),
+                    "channel_title": snippet.get("channelTitle", ""),
+                    "channel_id": snippet.get("channelId", ""),
+                    "published_at": snippet.get("publishedAt", ""),
+                    "duration": content_details.get("duration", ""),
+                    "view_count": int(statistics.get("viewCount", 0) or 0),
+                    "like_count": int(statistics.get("likeCount", 0) or 0),
+                    "comment_count": int(statistics.get("commentCount", 0) or 0),
+                    "tags": snippet.get("tags", []),
+                    "category_id": snippet.get("categoryId", ""),
+                    "default_language": snippet.get("defaultLanguage", ""),
+                    "thumbnail_url": snippet.get("thumbnails", {}).get("maxres", {}).get("url", "")
+                }
+            except Exception as e:
+                logger.warning(f"googleapiclient metadata fetch failed, falling back to HTTP: {e}")
+
+        # HTTP fallback using API key
+        if not self.youtube_api_key:
+            # Try refresh once in case env changed after start
+            self.youtube_api_key = os.getenv("YOUTUBE_API_KEY")
+        if not self.youtube_api_key:
             return {"error": "YouTube Data API not available"}
-        
+
         try:
-            request = self.youtube_service.videos().list(
-                part="snippet,statistics,contentDetails",
-                id=video_id
-            )
-            response = request.execute()
-            
-            if not response.get("items"):
-                return {"error": "Video not found"}
-            
-            video = response["items"][0]
-            snippet = video["snippet"]
+            params = {
+                "part": "snippet,statistics,contentDetails",
+                "id": video_id,
+                "key": self.youtube_api_key,
+            }
+            timeout = aiohttp.ClientTimeout(total=12)
+            async with aiohttp.ClientSession(timeout=timeout) as session:
+                async with session.get("https://www.googleapis.com/youtube/v3/videos", params=params) as resp:
+                    data = await resp.json()
+            if not data or not data.get("items"):
+                return {"error": data.get("error", {}).get("message", "Video not found") if isinstance(data, dict) else "Video not found"}
+            video = data["items"][0]
+            snippet = video.get("snippet", {})
             statistics = video.get("statistics", {})
             content_details = video.get("contentDetails", {})
-            
             return {
                 "video_id": video_id,
                 "title": snippet.get("title", ""),
@@ -85,17 +136,16 @@ class YouTubeProcessor:
                 "channel_id": snippet.get("channelId", ""),
                 "published_at": snippet.get("publishedAt", ""),
                 "duration": content_details.get("duration", ""),
-                "view_count": int(statistics.get("viewCount", 0)),
-                "like_count": int(statistics.get("likeCount", 0)),
-                "comment_count": int(statistics.get("commentCount", 0)),
+                "view_count": int(statistics.get("viewCount", 0) or 0),
+                "like_count": int(statistics.get("likeCount", 0) or 0),
+                "comment_count": int(statistics.get("commentCount", 0) or 0),
                 "tags": snippet.get("tags", []),
                 "category_id": snippet.get("categoryId", ""),
                 "default_language": snippet.get("defaultLanguage", ""),
                 "thumbnail_url": snippet.get("thumbnails", {}).get("maxres", {}).get("url", "")
             }
-            
         except Exception as e:
-            logger.error(f"Failed to get video metadata: {e}")
+            logger.error(f"HTTP YouTube metadata fetch failed: {e}")
             return {"error": str(e)}
     
     async def get_video_transcript(
