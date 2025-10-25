@@ -54,6 +54,8 @@ class CreatePodcastRequest(BaseModel):
     voice_settings: Optional[Dict[str, Any]] = {}
     podcast_settings: Optional[Dict[str, Any]] = {}
     podcast_metadata: Optional[Dict[str, Any]] = {}
+    duration_seconds: Optional[float] = None
+    duration_minutes: Optional[int] = None
 
 class PodcastResponse(BaseModel):
     id: str
@@ -92,6 +94,12 @@ async def create_and_generate_podcast(
     """
     try:
         podcast_id = f"podcast_{uuid.uuid4().hex[:12]}"
+        # Normalize duration to seconds if provided
+        duration_s = (
+            request.duration_seconds
+            if request.duration_seconds is not None
+            else (request.duration_minutes * 60 if request.duration_minutes is not None else None)
+        )
         podcast = Podcast(
             podcast_id=podcast_id,
             user_id=current_user.id,
@@ -103,6 +111,7 @@ async def create_and_generate_podcast(
             voice_settings=request.voice_settings or {},
             podcast_settings=request.podcast_settings or {},
             podcast_metadata=request.podcast_metadata or {},
+            duration_seconds=duration_s,
             created_at=datetime.utcnow(),
             script_generated_at=datetime.utcnow(),
         )
@@ -129,6 +138,12 @@ async def create_podcast(
     try:
         # Generate unique podcast ID
         podcast_id = f"podcast_{uuid.uuid4().hex[:12]}"
+        # Normalize duration to seconds if provided
+        duration_s = (
+            request.duration_seconds
+            if request.duration_seconds is not None
+            else (request.duration_minutes * 60 if request.duration_minutes is not None else None)
+        )
         
         # Create new podcast
         podcast = Podcast(
@@ -142,6 +157,7 @@ async def create_podcast(
             voice_settings=request.voice_settings or {},
             podcast_settings=request.podcast_settings or {},
             podcast_metadata=request.podcast_metadata or {},
+            duration_seconds=duration_s,
             created_at=datetime.utcnow()
         )
         
