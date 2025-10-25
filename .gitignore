@@ -45,3 +45,6 @@ env/
 .DS_Store
 Thumbs.db
 render-env-template.txt
+
+# Ignore large example demos
+cloud-vectordb-examples/

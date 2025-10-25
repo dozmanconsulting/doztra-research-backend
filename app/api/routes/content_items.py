@@ -568,7 +568,7 @@ async def search_content_vectors(
 # ---------------------------------------------------------------------------
 # Helper utilities for content chunking and persistence
 # ---------------------------------------------------------------------------
-def _split_into_chunks(text: str, max_chars: int = 1800):
+def _split_into_chunks(text: str, max_chars: int = 900):
     """Split long text into reasonably sized chunks while preserving sentence boundaries.
     Fallbacks to hard splits if punctuation-aware splitting isn't sufficient.
     """

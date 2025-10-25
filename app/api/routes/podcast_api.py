@@ -49,6 +49,59 @@ class PodcastListResponse(BaseModel):
     podcasts: List[PodcastResponse]
     total: int
 
+@router.post("/podcasts/generate", response_model=PodcastResponse)
+async def create_and_generate_podcast(
+    request: CreatePodcastRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Create a podcast and immediately start script generation.
+    Equivalent to POST /api/podcasts then POST /api/podcasts/{podcast_id}/generate.
+    """
+    try:
+        podcast_id = f"podcast_{uuid.uuid4().hex[:12]}"
+        podcast = Podcast(
+            podcast_id=podcast_id,
+            user_id=current_user.id,
+            title=request.title,
+            topic=request.topic,
+            description=request.description,
+            status="generating_script",
+            audio_format="mp3",
+            voice_settings=request.voice_settings or {},
+            podcast_settings=request.podcast_settings or {},
+            podcast_metadata=request.podcast_metadata or {},
+            created_at=datetime.utcnow(),
+            script_generated_at=datetime.utcnow(),
+        )
+
+        db.add(podcast)
+        db.commit()
+        db.refresh(podcast)
+
+        return PodcastResponse(
+            id=str(podcast.id),
+            podcast_id=podcast.podcast_id,
+            user_id=str(podcast.user_id),
+            title=podcast.title,
+            topic=podcast.topic,
+            description=podcast.description,
+            status=podcast.status,
+            duration_seconds=podcast.duration_seconds,
+            file_size_bytes=podcast.file_size_bytes,
+            audio_format=podcast.audio_format,
+            created_at=podcast.created_at,
+            script_generated_at=podcast.script_generated_at,
+            audio_generated_at=podcast.audio_generated_at,
+            completed_at=podcast.completed_at,
+        )
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to create & start podcast generation: {str(e)}",
+        )
+
 @router.post("/podcasts", response_model=PodcastResponse)
 async def create_podcast(
     request: CreatePodcastRequest,

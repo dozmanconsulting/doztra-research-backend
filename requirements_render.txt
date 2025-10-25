@@ -73,6 +73,7 @@ ffmpeg-python==0.2.0
 
 # Vector database - Milvus/Zilliz Cloud (NEW)
 pymilvus==2.3.4
+pinecone>=5,<6
 
 # Embeddings and ML (NEW)
 sentence-transformers==2.2.2
