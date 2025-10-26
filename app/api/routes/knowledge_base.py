@@ -29,6 +29,7 @@ from app.services.knowledge_base import (
     VectorStore,
     ConversationMemory
 )
+from app.services.token_usage import require_tokens
 
 router = APIRouter(prefix="/api/v1/knowledge", tags=["Knowledge Base"])
 
@@ -50,6 +51,8 @@ async def ingest_text_content(
     Ingest text content directly into the knowledge base.
     """
     try:
+        # Preflight token check (ingestion is lightweight; reserve a small amount)
+        require_tokens(db, str(current_user.id), estimated_tokens=200)
         content_id = str(uuid.uuid4())
         
         # Create content item record
@@ -104,6 +107,17 @@ async def ingest_file_content(
         
         # Determine content type from file
         content_type = content_processor.determine_content_type(file.filename, file.content_type)
+
+        # Dynamic preflight estimate based on content type
+        # audio/video -> higher due to transcription, docs moderate, others low
+        est = 300
+        if content_type in ["audio", "video"]:
+            est = 600
+        elif content_type in ["pdf", "doc", "docx", "ppt", "pptx"]:
+            est = 450
+        else:
+            est = 300
+        require_tokens(db, str(current_user.id), estimated_tokens=est)
         
         # Save file temporarily
         file_path = await kb_service.save_uploaded_file(file, content_id)
@@ -159,6 +173,8 @@ async def ingest_url_content(
     Scrape and process content from a URL.
     """
     try:
+        # Preflight token check for URL scraping and embedding
+        require_tokens(db, str(current_user.id), estimated_tokens=300)
         content_id = str(uuid.uuid4())
         
         # Parse metadata
@@ -211,6 +227,8 @@ async def ingest_youtube_content(
     Process YouTube video content (extract audio, transcribe, process).
     """
     try:
+        # Preflight token check for YouTube processing (transcription + embedding)
+        require_tokens(db, str(current_user.id), estimated_tokens=600)
         content_id = str(uuid.uuid4())
         
         # Parse metadata
@@ -260,6 +278,12 @@ async def query_knowledge_base(
     Query the knowledge base using RAG (Retrieval-Augmented Generation).
     """
     try:
+        # Preflight token check for RAG generation: base + per-document context
+        base_gen = 700
+        per_doc_ctx = 60
+        k = request.top_k or 10
+        est = base_gen + per_doc_ctx * min(max(k, 1), 50) + 100  # clamp k and add overhead
+        require_tokens(db, str(current_user.id), estimated_tokens=est)
         # Get conversation context if session_id provided
         conversation_context = None
         if request.session_id:

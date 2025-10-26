@@ -392,6 +392,7 @@ async def delete_user_conversation(
 @router.post("/query")
 async def query_with_documents_endpoint(
     request: QueryRequest,
+    db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
     """
@@ -410,6 +411,8 @@ async def query_with_documents_endpoint(
     - Sources used to generate the response
     """
     try:
+        # Preflight token check for document-aware generation
+        require_tokens(db, user_id=str(current_user.id), estimated_tokens=1000)
         # Call the service function
         response = await openai_service.query_with_documents(
             query=request.message,

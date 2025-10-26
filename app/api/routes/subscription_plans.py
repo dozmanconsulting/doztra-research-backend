@@ -18,7 +18,7 @@ def get_subscription_plans() -> Any:
         "free": {
             "name": "Free Plan",
             "price": 0,
-            "token_limit": 100000,
+            "token_limit": 500,
             "models": [ModelTier.GPT_3_5_TURBO.value],
             "features": [
                 "Basic AI chat",

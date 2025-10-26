@@ -136,14 +136,13 @@ def create_user(db: Session, user_in: UserCreate) -> User:
     max_model_tier = ModelTier.GPT_3_5_TURBO
     
     if plan == SubscriptionPlan.FREE:
-        token_limit = 100000
+        token_limit = 500
         max_model_tier = ModelTier.GPT_3_5_TURBO
     elif plan == SubscriptionPlan.BASIC:
         token_limit = 500000
         max_model_tier = ModelTier.GPT_4
     elif plan == SubscriptionPlan.PROFESSIONAL:
-        # Use a very large number to represent "unlimited" due to NOT NULL constraint
-        token_limit = 2147483647
+        token_limit = None
         max_model_tier = ModelTier.GPT_4_TURBO
     
     # Create subscription for the user
@@ -298,13 +297,13 @@ def update_subscription(
     max_model_tier = ModelTier.GPT_3_5_TURBO
     
     if plan == SubscriptionPlan.FREE:
-        token_limit = 100000
+        token_limit = 500
         max_model_tier = ModelTier.GPT_3_5_TURBO
     elif plan == SubscriptionPlan.BASIC:
         token_limit = 500000
         max_model_tier = ModelTier.GPT_4
     elif plan == SubscriptionPlan.PROFESSIONAL:
-        token_limit = None  # Unlimited
+        token_limit = None
         max_model_tier = ModelTier.GPT_4_TURBO
     
     if user.subscription:

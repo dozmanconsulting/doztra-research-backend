@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional
 from fastapi import HTTPException, status
 from app.models.token_usage import TokenUsage, TokenUsageSummary, RequestType
-from app.models.user import User, ModelTier
+from app.models.user import User, ModelTier, SubscriptionPlan
 from app.schemas.token_usage import TokenUsageCreate, TokenUsageTrack
 
 
@@ -248,7 +248,16 @@ def get_remaining_tokens(db: Session, user_id: str, period: Optional[str] = 'mon
     """
     start_of_period, end_of_period = _period_range(period)
     user = db.query(User).filter(User.id == user_id).first()
-    token_limit = user.subscription.token_limit if user and user.subscription else 0
+    # Derive token limit from plan
+    token_limit = 0
+    if user and user.subscription:
+        plan = user.subscription.plan
+        if plan == SubscriptionPlan.FREE:
+            token_limit = 500
+        elif plan == SubscriptionPlan.BASIC:
+            token_limit = 500000
+        elif plan == SubscriptionPlan.PROFESSIONAL:
+            token_limit = 0  # Unlimited
 
     # Sum usage in period
     summaries = db.query(TokenUsageSummary).filter(TokenUsageSummary.user_id == user_id).all()
@@ -304,28 +313,41 @@ def get_token_usage_statistics(db: Session, user_id: str, period: Optional[str] 
     """
     from sqlalchemy import func
     
-    # Get user subscription to determine token limit
+    # Get user subscription to determine token limit (aligned to plan)
     user = db.query(User).filter(User.id == user_id).first()
-    token_limit = user.subscription.token_limit if user and user.subscription else None
+    token_limit = None
+    if user and user.subscription:
+        plan = user.subscription.plan
+        if plan == SubscriptionPlan.FREE:
+            token_limit = 500
+        elif plan == SubscriptionPlan.BASIC:
+            token_limit = 500000
+        elif plan == SubscriptionPlan.PROFESSIONAL:
+            token_limit = None  # Unlimited
     
     # Get selected aggregation period
     start_of_period, end_of_period = _period_range(period)
     
-    # Get total tokens used in current period
-    current_period_usage = db.query(TokenUsageSummary).filter(
-        TokenUsageSummary.user_id == user_id,
-        # Filter by period by matching year/month inside the range
-        # Simplified: include summaries whose (year,month) falls in range
+    # Load summaries and filter by selected period in Python for portability
+    all_period_summaries = db.query(TokenUsageSummary).filter(
+        TokenUsageSummary.user_id == user_id
     ).all()
-    
-    tokens_used = sum(summary.total_tokens for summary in current_period_usage) if current_period_usage else 0
-    
-    # Calculate breakdown by type
-    chat_tokens = sum(summary.chat_total_tokens for summary in current_period_usage) if current_period_usage else 0
-    chat_prompt_tokens = sum(summary.chat_prompt_tokens for summary in current_period_usage) if current_period_usage else 0
-    chat_completion_tokens = sum(summary.chat_completion_tokens for summary in current_period_usage) if current_period_usage else 0
-    plagiarism_tokens = sum(summary.plagiarism_tokens for summary in current_period_usage) if current_period_usage else 0
-    prompt_generation_tokens = sum(summary.prompt_generation_tokens for summary in current_period_usage) if current_period_usage else 0
+
+    def _in_period(s: TokenUsageSummary) -> bool:
+        date_str = f"{s.year:04d}-{s.month:02d}-{s.day:02d}"
+        date_obj = datetime.strptime(date_str, "%Y-%m-%d")
+        return start_of_period.date() <= date_obj.date() <= end_of_period.date()
+
+    period_summaries = [s for s in all_period_summaries if _in_period(s)]
+
+    tokens_used = sum(s.total_tokens for s in period_summaries) if period_summaries else 0
+
+    # Calculate breakdown by type (within period only)
+    chat_tokens = sum(s.chat_total_tokens for s in period_summaries) if period_summaries else 0
+    chat_prompt_tokens = sum(s.chat_prompt_tokens for s in period_summaries) if period_summaries else 0
+    chat_completion_tokens = sum(s.chat_completion_tokens for s in period_summaries) if period_summaries else 0
+    plagiarism_tokens = sum(s.plagiarism_tokens for s in period_summaries) if period_summaries else 0
+    prompt_generation_tokens = sum(s.prompt_generation_tokens for s in period_summaries) if period_summaries else 0
     
     # Get breakdown by model
     model_breakdown = {}
@@ -343,13 +365,8 @@ def get_token_usage_statistics(db: Session, user_id: str, period: Optional[str] 
     end_date = end_of_period
     start_date = max(start_of_period, end_date - timedelta(days=30))
     
-    # Simplified approach for SQLite
-    # Just get all summaries and filter in Python
-    summaries = db.query(TokenUsageSummary).filter(
-        TokenUsageSummary.user_id == user_id
-    ).all()
-    
-    # Group by date in Python
+    # Simplified approach for SQLite: Group by date in Python
+    summaries = all_period_summaries
     date_totals = {}
     for summary in summaries:
         date_str = f"{summary.year:04d}-{summary.month:02d}-{summary.day:02d}"
