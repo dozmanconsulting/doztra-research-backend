@@ -171,54 +171,52 @@ async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
 
     try:
         if event_type == "checkout.session.completed":
-            # Retrieve expanded subscription to get customer/sub info
-            session_id = data.get("id")
+            # Retrieve session with needed expansions
             stripe.api_key = _require_env("STRIPE_SECRET_KEY")
-            session = stripe.checkout.Session.retrieve(session_id, expand=["subscription"])
+            session_id = data.get("id")
+            session = stripe.checkout.Session.retrieve(session_id, expand=["subscription", "payment_intent"])  # type: ignore
 
-            customer_id = session.get("customer")
-            subscription_id = session.get("subscription", {}).get("id") if isinstance(session.get("subscription"), dict) else session.get("subscription")
-            plan_meta = session.get("metadata", {}).get("plan")
-            user_id = session.get("metadata", {}).get("user_id")
+            mode = session.get("mode")
+            meta = session.get("metadata", {}) or {}
+            user_id = meta.get("user_id")
 
-            # Map plan string to internal enum
-            plan_enum = SubscriptionPlan.BASIC if plan_meta == "basic" else SubscriptionPlan.PROFESSIONAL
+            # Branch by session mode/metadata
+            if mode == "subscription":
+                plan_meta = meta.get("plan")
+                if plan_meta not in ("basic", "professional"):
+                    logger.info("Webhook subscription completed without valid plan metadata; ignoring")
+                    return {"status": "ignored"}
 
-            from app.services.user import get_user_by_id
-            user = get_user_by_id(db, user_id)
-            if not user:
-                logger.error(f"Webhook: user not found for user_id={user_id}")
-                return {"status": "ignored"}
+                plan_enum = SubscriptionPlan.BASIC if plan_meta == "basic" else SubscriptionPlan.PROFESSIONAL
+                customer_id = session.get("customer")
+                subscription_id = session.get("subscription", {}).get("id") if isinstance(session.get("subscription"), dict) else session.get("subscription")
 
-            update_subscription(
-                db=db,
-                user=user,
-                plan=plan_enum,
-                status=SubscriptionStatus.ACTIVE,
-                is_active=True,
-                auto_renew=True,
-                stripe_customer_id=customer_id,
-                stripe_subscription_id=subscription_id,
-            )
-            return {"status": "ok"}
+                from app.services.user import get_user_by_id
+                user = get_user_by_id(db, user_id)
+                if not user:
+                    logger.error(f"Webhook: user not found for user_id={user_id}")
+                    return {"status": "ignored"}
 
-        # Handle top-up sessions (one-time payments)
-        if event_type == "checkout.session.completed":
-            session_obj = data  # initial collapsed session
-            # Expand if needed
-            if not session_obj.get("metadata"):
-                stripe.api_key = _require_env("STRIPE_SECRET_KEY")
-                session_obj = stripe.checkout.Session.retrieve(data.get("id"), expand=["payment_intent"])  # type: ignore
-            meta = session_obj.get("metadata", {})
-            if meta.get("type") == "topup":
-                user_id = meta.get("user_id")
+                update_subscription(
+                    db=db,
+                    user=user,
+                    plan=plan_enum,
+                    status=SubscriptionStatus.ACTIVE,
+                    is_active=True,
+                    auto_renew=True,
+                    stripe_customer_id=customer_id,
+                    stripe_subscription_id=subscription_id,
+                )
+                return {"status": "ok"}
+
+            # Handle top-up sessions (one-time payments)
+            if mode == "payment" and meta.get("type") == "topup":
                 tokens_str = meta.get("tokens", "0")
                 try:
                     tokens_to_add = int(tokens_str)
                 except Exception:
                     tokens_to_add = 0
                 if tokens_to_add > 0 and user_id:
-                    # Increment bonus_tokens_remaining
                     from sqlalchemy import text
                     db.execute(text("""
                         INSERT INTO user_usage (user_id, day_tokens_used, day_anchor, month_tokens_used, month_anchor, bonus_tokens_remaining, updated_at)
