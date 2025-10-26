@@ -66,11 +66,15 @@ def create_checkout_session(payload: Dict[str, Any], db: Session = Depends(get_d
         else:
             price_id = price_basic if plan == "basic" else price_pro
 
+        # Build success URL with safe separator
+        sep = '&' if '?' in success_url else '?'
+        success_cb = f"{success_url}{sep}session_id={{CHECKOUT_SESSION_ID}}"
+
         session = stripe.checkout.Session.create(
             mode="subscription",
             customer=customer_id,
             line_items=[{"price": price_id, "quantity": 1}],
-            success_url=success_url + "?session_id={CHECKOUT_SESSION_ID}",
+            success_url=success_cb,
             cancel_url=cancel_url,
             metadata={
                 "user_id": current_user.id,
@@ -132,11 +136,15 @@ def create_topup_session(payload: Dict[str, Any], db: Session = Depends(get_db),
             )
             customer_id = customer.id
 
+        # Build success URL with safe separator
+        sep = '&' if '?' in success_url else '?'
+        success_cb = f"{success_url}{sep}session_id={{CHECKOUT_SESSION_ID}}"
+
         session = stripe.checkout.Session.create(
             mode="payment",
             customer=customer_id,
             line_items=[{"price": price_id, "quantity": 1}],
-            success_url=success_url + "?session_id={CHECKOUT_SESSION_ID}",
+            success_url=success_cb,
             cancel_url=cancel_url,
             metadata={
                 "user_id": current_user.id,
@@ -217,6 +225,7 @@ async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
                 except Exception:
                     tokens_to_add = 0
                 if tokens_to_add > 0 and user_id:
+                    logger.info(f"Crediting token pack: user_id={user_id}, tokens={tokens_to_add}")
                     from sqlalchemy import text
                     db.execute(text("""
                         INSERT INTO user_usage (user_id, day_tokens_used, day_anchor, month_tokens_used, month_anchor, bonus_tokens_remaining, updated_at)

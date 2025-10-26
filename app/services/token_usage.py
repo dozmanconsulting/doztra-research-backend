@@ -1,4 +1,5 @@
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional
 from fastapi import HTTPException, status
@@ -32,6 +33,51 @@ def create_token_usage(db: Session, token_usage_in: TokenUsageCreate) -> TokenUs
     
     # Update user's usage statistics
     update_user_usage_statistics(db, db_token_usage.user_id, db_token_usage.total_tokens)
+
+    # Deduct from token pack if this usage pushes the user beyond their plan limit for the period
+    try:
+        user = db.query(User).filter(User.id == db_token_usage.user_id).first()
+        # Determine plan token limit for the month (0 means unlimited)
+        token_limit = 0
+        if user and user.subscription:
+            plan = user.subscription.plan
+            if plan == SubscriptionPlan.FREE:
+                token_limit = 500
+            elif plan == SubscriptionPlan.BASIC:
+                token_limit = 500000
+            elif plan == SubscriptionPlan.PROFESSIONAL:
+                token_limit = 0  # Unlimited
+
+        if token_limit:
+            # Compute tokens used in current month after this record
+            start_of_period, end_of_period = _period_range('month')
+            summaries = db.query(TokenUsageSummary).filter(TokenUsageSummary.user_id == db_token_usage.user_id).all()
+            used_after = 0
+            for summary in summaries:
+                date_str = f"{summary.year:04d}-{summary.month:02d}-{summary.day:02d}"
+                date_obj = datetime.strptime(date_str, "%Y-%m-%d")
+                if start_of_period.date() <= date_obj.date() <= end_of_period.date():
+                    used_after += summary.total_tokens
+
+            used_before = max(0, used_after - (db_token_usage.total_tokens or 0))
+            overage_before = max(0, used_before - token_limit)
+            overage_after = max(0, used_after - token_limit)
+            decrement = max(0, overage_after - overage_before)
+
+            if decrement > 0:
+                # Upsert row and decrement pack by the overage
+                db.execute(text(
+                    """
+                    INSERT INTO user_usage (user_id, day_tokens_used, day_anchor, month_tokens_used, month_anchor, bonus_tokens_remaining, updated_at)
+                    VALUES (:uid, 0, CURRENT_DATE, 0, date_trunc('month', NOW())::date, 0, NOW())
+                    ON CONFLICT (user_id) DO UPDATE SET bonus_tokens_remaining = GREATEST(user_usage.bonus_tokens_remaining - :dec, 0),
+                                                         updated_at = NOW()
+                    """
+                ), {"uid": db_token_usage.user_id, "dec": int(decrement)})
+                db.commit()
+    except Exception:
+        # Non-fatal; do not block usage recording if pack deduction fails
+        pass
     
     return db_token_usage
 
@@ -243,8 +289,8 @@ def _end_of_day(dt: datetime) -> datetime:
 
 def get_remaining_tokens(db: Session, user_id: str, period: Optional[str] = 'month') -> Dict[str, Any]:
     """
-    Compute remaining tokens for the current period based on subscription token_limit.
-    Token packs not yet implemented; pack_balance assumed 0.
+    Compute remaining tokens for the current period based on subscription plan limit
+    plus any one-time token packs (bonus_tokens_remaining).
     """
     start_of_period, end_of_period = _period_range(period)
     user = db.query(User).filter(User.id == user_id).first()
@@ -269,7 +315,17 @@ def get_remaining_tokens(db: Session, user_id: str, period: Optional[str] = 'mon
             if start_of_period.date() <= date_obj.date() <= end_of_period.date():
                 tokens_used += summary.total_tokens
 
-    remaining = max(0, (token_limit or 0) - tokens_used)
+    # Read pack balance
+    pack_balance = 0
+    try:
+        row = db.execute(text("SELECT bonus_tokens_remaining FROM user_usage WHERE user_id = :uid"), {"uid": user_id}).fetchone()
+        if row and row[0] is not None:
+            pack_balance = int(row[0])
+    except Exception:
+        pack_balance = 0
+
+    plan_remaining = max(0, (token_limit or 0) - tokens_used)
+    remaining = plan_remaining + pack_balance
     percent_used = (tokens_used / token_limit * 100) if token_limit else None
 
     threshold = None
@@ -288,13 +344,16 @@ def get_remaining_tokens(db: Session, user_id: str, period: Optional[str] = 'mon
         'percent_used': percent_used,
         'next_reset_at': _end_of_day(end_of_period).isoformat(),
         'threshold': threshold,
-        'pack_balance': 0,
+        'pack_balance': pack_balance,
     }
 
 
 def require_tokens(db: Session, user_id: str, estimated_tokens: int, period: Optional[str] = 'month') -> None:
     stats = get_remaining_tokens(db, user_id, period)
-    if stats['limit'] and stats['remaining'] < max(1, estimated_tokens):
+    # Unlimited plans have limit==0
+    if stats['limit'] == 0:
+        return
+    if stats['remaining'] < max(1, estimated_tokens):
         raise HTTPException(
             status_code=402,
             detail={
