@@ -186,6 +186,7 @@ async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
 
             mode = session.get("mode")
             meta = session.get("metadata", {}) or {}
+            logger.info(f"checkout.session.completed mode={mode} metadata={meta}")
             user_id = meta.get("user_id")
 
             # Branch by session mode/metadata
@@ -229,10 +230,10 @@ async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
                     from sqlalchemy import text
                     db.execute(text("""
                         INSERT INTO user_usage (user_id, day_tokens_used, day_anchor, month_tokens_used, month_anchor, bonus_tokens_remaining, updated_at)
-                        VALUES (:uid, 0, CURRENT_DATE, 0, date_trunc('month', NOW())::date, :tokens, NOW())
+                        VALUES (:uid::uuid, 0, CURRENT_DATE, 0, date_trunc('month', NOW())::date, :tokens, NOW())
                         ON CONFLICT (user_id) DO UPDATE SET bonus_tokens_remaining = user_usage.bonus_tokens_remaining + :tokens,
                                                              updated_at = NOW()
-                    """), {"uid": user_id, "tokens": tokens_to_add})
+                    """), {"uid": str(user_id), "tokens": tokens_to_add})
                     db.commit()
                 return {"status": "ok"}
 
